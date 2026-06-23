@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import type { Role } from "@pleno-crm/types";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   providers: [
     Credentials({
       credentials: {
