@@ -183,6 +183,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Return 200 immediately to avoid N8N timeout, process async
   const payload = (await request.json()) as WebhookPayload;
 
+  // DEBUG: loga o payload recebido antes de processar
+  console.log(
+    "[webhook/whatsapp] Payload recebido:",
+    JSON.stringify(payload)
+  );
+
   setImmediate(async () => {
     try {
       if (payload.event === "messages.upsert") {
@@ -192,7 +198,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
       // connection.update: log only, no DB action needed
     } catch (err) {
-      console.error("[webhook/whatsapp] Erro ao processar evento:", err);
+      // JSON.stringify(err) puro retorna "{}" para Error (props nao-enumeraveis),
+      // entao serializa name/message/stack explicitamente e tambem loga o err cru.
+      const serialized =
+        err instanceof Error
+          ? { name: err.name, message: err.message, stack: err.stack }
+          : err;
+      console.error(
+        "[webhook/whatsapp] Erro ao processar evento:",
+        JSON.stringify(serialized)
+      );
+      console.error("[webhook/whatsapp] Erro (raw):", err);
     }
   });
 
