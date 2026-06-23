@@ -22,7 +22,7 @@ app.prepare().then(() => {
 
   initWebSocketServer(server);
 
-  server.listen(port, hostname, () => {
-    console.log(`[server] Pronto em http://${hostname}:${port}`);
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`[server] Pronto em http://0.0.0.0:${port}`);
   });
 });
