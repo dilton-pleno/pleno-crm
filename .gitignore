@@ -41,5 +41,8 @@ Thumbs.db
 # Testing
 coverage
 
+# Docs (PRD e specs internos, nao versionar)
+docs/
+
 # Misc
 *.tsbuildinfo
