@@ -144,7 +144,7 @@ export function ConversationList({ conversations, selectedId, onSelect, currentU
                       : "Sem mensagens"}
                   </p>
                   {conv.unread_count > 0 && (
-                    <span className="flex-shrink-0 bg-primary text-primary-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    <span className="flex-shrink-0 bg-orange-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
                       {conv.unread_count > 9 ? "9+" : conv.unread_count}
                     </span>
                   )}
