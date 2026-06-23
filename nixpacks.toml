@@ -10,5 +10,7 @@ cmds = [
   "npx prisma generate --schema=apps/web/prisma/schema.prisma && npm run build --workspace=@pleno-crm/web",
 ]
 
+# O migrate deploy roda no boot do container (com acesso ao banco de producao),
+# logo antes do start. As fases [phases.*] rodam em build da imagem, sem banco.
 [start]
-cmd = "npm run start --workspace=@pleno-crm/web"
+cmd = "npx prisma migrate deploy --schema=apps/web/prisma/schema.prisma && npm run start --workspace=@pleno-crm/web"
