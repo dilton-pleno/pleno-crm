@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -74,7 +75,7 @@ export async function POST(
       contactId: id,
       channelType: channel_type,
       channelIdentifier: channel_identifier,
-      metadata: metadata ?? null,
+      metadata: metadata ?? Prisma.JsonNull,
     },
   });
 
