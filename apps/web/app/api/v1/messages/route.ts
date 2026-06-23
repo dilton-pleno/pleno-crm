@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/lib/auth";
+import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia } from "@/lib/evolution";
 import { emitEvent } from "@/lib/websocket";
@@ -13,13 +13,9 @@ const schema = z.object({
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json(
-      { error: { code: "UNAUTHORIZED", message: "Não autenticado" } },
-      { status: 401 }
-    );
-  }
+  const guard = await requireAccess("atendimento", "full");
+  if (!guard.ok) return guard.response;
+  const session = guard.session;
 
   const body = await request.json();
   const parsed = schema.safeParse(body);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { auth } from "@/lib/auth";
+import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 
 const schema = z.object({
@@ -14,13 +14,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json(
-      { error: { code: "UNAUTHORIZED", message: "Não autenticado" } },
-      { status: 401 }
-    );
-  }
+  const guard = await requireAccess("contatos", "full");
+  if (!guard.ok) return guard.response;
 
   const { id } = await params;
 
