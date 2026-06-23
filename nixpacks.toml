@@ -1,0 +1,12 @@
+# Nixpacks config para monorepo Turborepo + Coolify
+# O install roda na raiz para resolver pacotes workspace locais (@pleno-crm/types)
+# O build e start delegam para o workspace apps/web
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build --workspace=@pleno-crm/web"]
+
+[start]
+cmd = "npm run start --workspace=@pleno-crm/web"
