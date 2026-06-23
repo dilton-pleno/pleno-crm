@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json(
-      { error: { code: "UNAUTHORIZED", message: "Não autenticado" } },
-      { status: 401 }
-    );
-  }
+  const guard = await requireAccess("contatos");
+  if (!guard.ok) return guard.response;
 
   const { id } = await params;
 

@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import type { ConversationStatus } from "@prisma/client";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const session = await auth();
-  if (!session) {
-    return NextResponse.json(
-      { error: { code: "UNAUTHORIZED", message: "Não autenticado" } },
-      { status: 401 }
-    );
-  }
+  const guard = await requireAccess("atendimento");
+  if (!guard.ok) return guard.response;
+  const session = guard.session;
 
   const { searchParams } = request.nextUrl;
   const status = searchParams.get("status") as ConversationStatus | null;
