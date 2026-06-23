@@ -75,7 +75,7 @@ export async function POST(
       contactId: id,
       channelType: channel_type,
       channelIdentifier: channel_identifier,
-      metadata: metadata ?? Prisma.JsonNull,
+      metadata: metadata as Prisma.InputJsonValue | undefined,
     },
   });
 
