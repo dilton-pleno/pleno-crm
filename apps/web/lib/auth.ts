@@ -67,6 +67,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
 });
 
+// No NextAuth v5 (Auth.js) o tipo JWT estende Record<string, unknown>,
+// portanto token.id e token.role sao atribuiveis sem augmentar o modulo
+// next-auth/jwt (cujo augment quebra a resolucao sob moduleResolution bundler).
 declare module "next-auth" {
   interface User {
     role: Role;
@@ -78,12 +81,5 @@ declare module "next-auth" {
       email: string;
       role: Role;
     };
-  }
-}
-
-declare module "next-auth/jwt" {
-  interface JWT {
-    id: string;
-    role: Role;
   }
 }
