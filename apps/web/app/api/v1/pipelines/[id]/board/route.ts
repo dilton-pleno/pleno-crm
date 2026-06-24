@@ -1,0 +1,128 @@
+import { NextRequest, NextResponse } from "next/server";
+import type { Prisma, ChannelType } from "@prisma/client";
+import { requireAccess } from "@/lib/api-auth";
+import { prisma } from "@/lib/prisma";
+
+const CHANNEL_VALUES: ChannelType[] = ["whatsapp", "instagram", "messenger", "email", "site"];
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+  const guard = await requireAccess("kanban");
+  if (!guard.ok) return guard.response;
+
+  const { id } = await params;
+  const { searchParams } = request.nextUrl;
+
+  const agentId = searchParams.get("agent_id");
+  const channelParam = searchParams.get("channel");
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+
+  // Filtros aplicados nos cards (agente/canal vêm da conversa).
+  const conversationFilter: Prisma.ConversationWhereInput = {};
+  if (agentId) conversationFilter.assignedTo = agentId;
+  if (channelParam && (CHANNEL_VALUES as string[]).includes(channelParam)) {
+    conversationFilter.channel = { channelType: channelParam as ChannelType };
+  }
+
+  const cardWhere: Prisma.PipelineCardWhereInput = {};
+  if (Object.keys(conversationFilter).length > 0) {
+    cardWhere.conversation = conversationFilter;
+  }
+  if (from || to) {
+    cardWhere.createdAt = {
+      ...(from ? { gte: new Date(from) } : {}),
+      ...(to ? { lte: new Date(to) } : {}),
+    };
+  }
+
+  const pipeline = await prisma.pipeline.findUnique({
+    where: { id },
+    include: {
+      stages: {
+        orderBy: { position: "asc" },
+        include: {
+          cards: {
+            where: cardWhere,
+            orderBy: { updatedAt: "desc" },
+            include: {
+              conversation: {
+                include: {
+                  channel: { select: { channelType: true } },
+                  agent: { select: { id: true, name: true } },
+                  messages: {
+                    orderBy: { sentAt: "desc" },
+                    take: 1,
+                    select: { content: true, sentAt: true },
+                  },
+                },
+              },
+              contact: { select: { id: true, name: true, avatarUrl: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!pipeline) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "Pipeline não encontrado" } },
+      { status: 404 }
+    );
+  }
+
+  const now = Date.now();
+
+  const stages = pipeline.stages.map((stage) => {
+    const cards = stage.cards.map((card) => {
+      const lastMsg = card.conversation.messages[0];
+      const lastActivity = lastMsg?.sentAt ?? card.updatedAt;
+      return {
+        id: card.id,
+        conversation_id: card.conversationId,
+        contact: {
+          id: card.contact.id,
+          name: card.contact.name,
+          avatar_url: card.contact.avatarUrl,
+        },
+        channel_type: card.conversation.channel.channelType,
+        last_message_preview: lastMsg?.content ?? null,
+        last_activity_at: lastActivity.toISOString(),
+        assigned_to: card.conversation.agent
+          ? {
+              id: card.conversation.agent.id,
+              name: card.conversation.agent.name,
+              avatar_url: null,
+            }
+          : null,
+      };
+    });
+
+    // Tempo médio de permanência: média de (agora - última movimentação).
+    const avgMs =
+      stage.cards.length > 0
+        ? stage.cards.reduce((acc, c) => acc + (now - c.updatedAt.getTime()), 0) /
+          stage.cards.length
+        : 0;
+
+    return {
+      id: stage.id,
+      name: stage.name,
+      color: stage.color,
+      position: stage.position,
+      card_count: cards.length,
+      avg_time_seconds: Math.round(avgMs / 1000),
+      cards,
+    };
+  });
+
+  return NextResponse.json({
+    data: {
+      pipeline: { id: pipeline.id, name: pipeline.name },
+      stages,
+    },
+  });
+}

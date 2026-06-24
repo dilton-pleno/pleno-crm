@@ -44,6 +44,24 @@ export async function PATCH(
     status: updated.status,
   });
 
+  // Ao resolver a conversa, move o card do Kanban para o estágio "Resolvido".
+  if (updated.status === "resolved") {
+    const [card, resolvidoStage] = await Promise.all([
+      prisma.pipelineCard.findFirst({ where: { conversationId: id } }),
+      prisma.pipelineStage.findFirst({
+        where: { name: { equals: "Resolvido", mode: "insensitive" } },
+        orderBy: { position: "asc" },
+      }),
+    ]);
+    if (card && resolvidoStage && card.stageId !== resolvidoStage.id) {
+      await prisma.pipelineCard.update({
+        where: { id: card.id },
+        data: { stageId: resolvidoStage.id },
+      });
+      emitEvent("card:moved", { cardId: card.id, stageId: resolvidoStage.id });
+    }
+  }
+
   return NextResponse.json({
     data: { id: updated.id, status: updated.status },
   });
