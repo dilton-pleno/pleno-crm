@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { SlidersHorizontal, Zap, ChevronRight } from "lucide-react";
+import { SlidersHorizontal, Zap, Users, ChevronRight } from "lucide-react";
 
 export default async function ConfiguracoesPage() {
   const session = await auth();
@@ -9,6 +9,12 @@ export default async function ConfiguracoesPage() {
   if (session.user.role !== "ADMIN") redirect("/atendimento");
 
   const items = [
+    {
+      href: "/configuracoes/usuarios",
+      icon: Users,
+      title: "Usuários",
+      description: "Gerenciar usuários, papéis e acesso",
+    },
     {
       href: "/configuracoes/pipeline",
       icon: SlidersHorizontal,
