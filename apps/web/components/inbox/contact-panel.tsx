@@ -1,7 +1,8 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Phone, Mail, Hash, CheckCircle, Clock, ExternalLink } from "lucide-react";
+import { Phone, Mail, Hash, CheckCircle, Clock, ExternalLink, Link2 } from "lucide-react";
 
 interface Channel {
   id: string;
@@ -33,12 +34,20 @@ const CHANNEL_LABELS: Record<string, string> = {
   site: "Site",
 };
 
+interface LinkSuggestion {
+  contact_id: string;
+  name: string;
+  channels: Array<{ channel_type: string; channel_identifier: string }>;
+}
+
 interface Props {
   contact: Contact | null;
   conversation: ConversationMeta | null;
   onResolve: () => void;
   onPending: () => void;
   onAssignMe: () => void;
+  onLinked?: () => void;
+  canLink?: boolean;
   currentUserId: string;
 }
 
@@ -48,8 +57,58 @@ export function ContactPanel({
   onResolve,
   onPending,
   onAssignMe,
+  onLinked,
+  canLink = false,
   currentUserId,
 }: Props) {
+  const [suggestions, setSuggestions] = useState<LinkSuggestion[]>([]);
+  const [linking, setLinking] = useState<string | null>(null);
+
+  const contactId = contact?.id ?? null;
+
+  useEffect(() => {
+    if (!contactId || !canLink) {
+      setSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/v1/contacts/${contactId}/link-suggestions`);
+        if (res.ok) {
+          const json = (await res.json()) as { data: LinkSuggestion[] };
+          if (!cancelled) setSuggestions(json.data);
+        }
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contactId, canLink]);
+
+  const handleLink = useCallback(
+    async (sourceId: string) => {
+      if (!contactId) return;
+      setLinking(sourceId);
+      try {
+        const res = await fetch(`/api/v1/contacts/${contactId}/merge`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ source_contact_id: sourceId }),
+        });
+        if (res.ok) {
+          setSuggestions((s) => s.filter((sug) => sug.contact_id !== sourceId));
+          onLinked?.();
+        }
+      } finally {
+        setLinking(null);
+      }
+    },
+    [contactId, onLinked]
+  );
+
   if (!contact || !conversation) {
     return (
       <div
@@ -138,6 +197,36 @@ export function ContactPanel({
           </button>
         )}
       </div>
+
+      {/* Sugestão de vinculação de canais (Módulo 2.5) */}
+      {canLink &&
+        suggestions.map((sug) => {
+          const ch = sug.channels[0];
+          const chLabel = ch ? CHANNEL_LABELS[ch.channel_type] ?? ch.channel_type : "";
+          return (
+            <div key={sug.contact_id} className="p-4 border-b border-border bg-primary/5">
+              <div className="flex items-start gap-2">
+                <Link2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-foreground">
+                    Este contato pode ser o mesmo que{" "}
+                    <span className="font-medium">
+                      {chLabel} {ch?.channel_identifier}
+                    </span>
+                    . Deseja vincular o histórico?
+                  </p>
+                  <button
+                    onClick={() => void handleLink(sug.contact_id)}
+                    disabled={linking === sug.contact_id}
+                    className="mt-2 px-3 py-1 text-xs bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+                  >
+                    {linking === sug.contact_id ? "Vinculando..." : "Vincular"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
 
       {/* Canais vinculados */}
       <div className="p-4 border-b border-border">

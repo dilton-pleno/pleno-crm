@@ -92,6 +92,29 @@ export function sendMessengerMessage(recipientId: string, text: string): Promise
   return sendViaGraph(recipientId, text);
 }
 
+/**
+ * Responde um comentário de forma privada, abrindo um Direct com o autor
+ * (Module 2.4 — "converter comentário em Direct"). A Graph API roteia a
+ * mensagem para a DM quando o recipient é `comment_id`.
+ */
+export async function sendPrivateReply(commentId: string, text: string): Promise<SendResponse> {
+  const res = await fetch(`${graphUrl(`${pageId()}/messages`)}?access_token=${accessToken()}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      recipient: { comment_id: commentId },
+      message: { text },
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Meta sendPrivateReply falhou [${res.status}]: ${body}`);
+  }
+
+  return res.json() as Promise<SendResponse>;
+}
+
 interface ReplyResponse {
   id?: string;
   error?: { message: string };
@@ -132,6 +155,19 @@ export async function getRecentPosts(igUserId: string, limit = 20): Promise<Grap
   }
   const json = (await res.json()) as { data?: GraphPost[] };
   return json.data ?? [];
+}
+
+/** Busca caption/mídia de um post específico (usado ao registrar comentários). */
+export async function getPostById(postId: string): Promise<GraphPost | null> {
+  try {
+    const res = await fetch(
+      `${graphUrl(postId)}?fields=id,media_url,caption,timestamp,comments_count&access_token=${accessToken()}`
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as GraphPost;
+  } catch {
+    return null;
+  }
 }
 
 export interface GraphComment {

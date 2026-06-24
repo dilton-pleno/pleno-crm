@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature, getUserProfile } from "@/lib/meta";
 import { ingestInboundMessage } from "@/lib/inbound-message";
+import { upsertPostComment } from "@/lib/post-comment";
 
 // ============================================================
 // Tipos do payload da Meta (Instagram Direct / Messenger)
@@ -15,7 +16,21 @@ interface MetaEntry {
   id: string;
   time: number;
   messaging?: MetaMessaging[];
-  changes?: unknown[]; // "comments"/"mentions" — tratados no Módulo 2.4
+  changes?: MetaChange[];
+}
+
+interface MetaChange {
+  field: string; // "comments" | "mentions" | ...
+  value: MetaCommentValue;
+}
+
+// Payload de um comentário em post do Instagram (field "comments").
+interface MetaCommentValue {
+  id?: string; // id do comentário
+  text?: string;
+  parent_id?: string;
+  from?: { id?: string; username?: string };
+  media?: { id?: string };
 }
 
 interface MetaMessaging {
@@ -86,6 +101,21 @@ async function handleMessaging(object: string, event: MetaMessaging): Promise<vo
   });
 }
 
+async function handleCommentChange(value: MetaCommentValue): Promise<void> {
+  const commentId = value.id;
+  const postId = value.media?.id;
+  // Sem id de comentário ou post não há como registrar/responder depois.
+  if (!commentId || !postId) return;
+
+  await upsertPostComment({
+    commentId,
+    postId,
+    authorId: value.from?.id ?? "",
+    authorName: value.from?.username ?? "Desconhecido",
+    content: value.text ?? "",
+  });
+}
+
 // ============================================================
 // GET: verificação do webhook (challenge)
 // ============================================================
@@ -135,7 +165,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         for (const event of entry.messaging ?? []) {
           await handleMessaging(payload.object, event);
         }
-        // entry.changes (comments/mentions) será tratado no Módulo 2.4
+        for (const change of entry.changes ?? []) {
+          if (change.field === "comments") {
+            await handleCommentChange(change.value);
+          }
+          // "mentions" e outros campos: reservados para evoluções futuras.
+        }
       }
     } catch (err) {
       console.error("[webhook/meta] Erro ao processar evento:", err);

@@ -3,6 +3,7 @@ import { canAccess } from "@/lib/permissions";
 import type { Role, Module } from "@pleno-crm/types";
 import {
   MessageCircle,
+  MessageSquare,
   LayoutGrid,
   BarChart2,
   Users,
@@ -19,6 +20,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Atendimento", href: "/atendimento", icon: MessageCircle, module: "atendimento" },
+  { label: "Comentários", href: "/atendimento/comentarios", icon: MessageSquare, module: "atendimento" },
   { label: "Kanban",      href: "/kanban",      icon: LayoutGrid,    module: "kanban"      },
   { label: "Contatos",    href: "/contatos",    icon: Users,         module: "contatos"    },
   { label: "Campanhas",   href: "/campanhas",   icon: BarChart2,     module: "campanhas"   },
@@ -34,6 +36,15 @@ interface SidebarProps {
 export function Sidebar({ role, currentPath }: SidebarProps) {
   const visibleItems = NAV_ITEMS.filter((item) => canAccess(role, item.module));
 
+  // Destaca apenas o item mais específico (href mais longo) que casa com a rota,
+  // evitando que "/atendimento" e "/atendimento/comentarios" fiquem ativos juntos.
+  const activeHref = visibleItems
+    .filter((item) => currentPath === item.href || currentPath.startsWith(item.href + "/"))
+    .reduce<string | null>(
+      (best, item) => (best && best.length >= item.href.length ? best : item.href),
+      null
+    );
+
   return (
     <aside className="w-[240px] shrink-0 bg-sidebar flex flex-col h-screen sticky top-0">
       <div className="px-5 py-5 border-b border-sidebar-border">
@@ -48,7 +59,7 @@ export function Sidebar({ role, currentPath }: SidebarProps) {
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {visibleItems.map((item) => {
           const Icon = item.icon;
-          const isActive = currentPath.startsWith(item.href);
+          const isActive = activeHref === item.href;
           return (
             <Link
               key={item.href}

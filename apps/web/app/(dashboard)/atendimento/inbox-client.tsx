@@ -6,6 +6,7 @@ import { MessageTimeline } from "@/components/inbox/message-timeline";
 import { MessageInput } from "@/components/inbox/message-input";
 import { ContactPanel } from "@/components/inbox/contact-panel";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { getAccessLevel } from "@/lib/permissions";
 import type { Role } from "@pleno-crm/types";
 
 interface ConversationItem {
@@ -45,7 +46,8 @@ interface Props {
   currentUserRole: Role;
 }
 
-export function InboxClient({ currentUserId }: Props) {
+export function InboxClient({ currentUserId, currentUserRole }: Props) {
+  const canLink = getAccessLevel(currentUserRole, "contatos") === "full";
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageItem[]>([]);
@@ -235,6 +237,11 @@ export function InboxClient({ currentUserId }: Props) {
         onResolve={() => void updateStatus("resolved")}
         onPending={() => void updateStatus("pending")}
         onAssignMe={() => void assignMe()}
+        onLinked={() => {
+          void fetchConversations();
+          if (selectedId) void fetchContact(selectedId, conversations);
+        }}
+        canLink={canLink}
         currentUserId={currentUserId}
       />
     </div>
