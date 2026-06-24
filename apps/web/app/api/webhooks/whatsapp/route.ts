@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { emitEvent } from "@/lib/websocket";
+import { ingestInboundMessage } from "@/lib/inbound-message";
 
 type WhatsAppEvent = "messages.upsert" | "messages.update" | "connection.update";
 
@@ -76,80 +76,19 @@ async function handleMessageUpsert(data: MessageUpsertData): Promise<void> {
 
   const phone = extractPhone(data.key.remoteJid);
   const { content, mediaUrl, mediaType } = extractMediaInfo(data);
-  const sentAt = new Date(data.messageTimestamp * 1000);
 
-  // Contact has no @unique on phone, so we use findFirst + create
-  const existingContact = await prisma.contact.findFirst({ where: { phone } });
-  const resolvedContact = existingContact ?? await prisma.contact.create({
-    data: { name: data.pushName ?? phone, phone },
+  await ingestInboundMessage({
+    channelType: "whatsapp",
+    channelIdentifier: phone,
+    contactName: data.pushName ?? phone,
+    phone,
+    externalId: data.key.id,
+    content,
+    mediaUrl,
+    mediaType,
+    sentAt: new Date(data.messageTimestamp * 1000),
+    inboxName: "WhatsApp",
   });
-
-  const channel = await prisma.contactChannel.upsert({
-    where: {
-      channelType_channelIdentifier: {
-        channelType: "whatsapp",
-        channelIdentifier: phone,
-      },
-    },
-    create: {
-      contactId: resolvedContact.id,
-      channelType: "whatsapp",
-      channelIdentifier: phone,
-    },
-    update: {},
-  });
-
-  let conversation = await prisma.conversation.findFirst({
-    where: {
-      channelId: channel.id,
-      status: { not: "resolved" },
-    },
-  });
-
-  const isNewConversation = !conversation;
-
-  if (!conversation) {
-    conversation = await prisma.conversation.create({
-      data: {
-        contactId: resolvedContact.id,
-        channelId: channel.id,
-        status: "open",
-        inboxName: "WhatsApp",
-      },
-    });
-  } else if (conversation.status === "resolved") {
-    conversation = await prisma.conversation.update({
-      where: { id: conversation.id },
-      data: { status: "open", updatedAt: new Date() },
-    });
-  }
-
-  const existing = await prisma.message.findFirst({ where: { externalId: data.key.id } });
-  if (existing) return;
-
-  const message = await prisma.message.create({
-    data: {
-      conversationId: conversation.id,
-      direction: "in",
-      content,
-      mediaUrl,
-      mediaType: mediaType as "image" | "audio" | "document" | "sticker" | "video" | undefined,
-      externalId: data.key.id,
-      sentAt,
-    },
-  });
-
-  if (isNewConversation) {
-    emitEvent("conversation:new", {
-      conversationId: conversation.id,
-      contactId: resolvedContact.id,
-    });
-  } else {
-    emitEvent("message:new", {
-      conversationId: conversation.id,
-      messageId: message.id,
-    });
-  }
 }
 
 async function handleMessageUpdate(data: MessageUpdateData): Promise<void> {

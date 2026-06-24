@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia } from "@/lib/evolution";
+import { sendInstagramDirect, sendMessengerMessage } from "@/lib/meta";
 import { emitEvent } from "@/lib/websocket";
 
 const schema = z.object({
@@ -40,24 +41,47 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const instanceName = process.env.EVOLUTION_INSTANCE ?? "atendimento";
+  const channelType = conversation.channel.channelType;
   const to = conversation.channel.channelIdentifier;
 
+  if (!content && !media_url) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "content ou media_url obrigatório" } },
+      { status: 422 }
+    );
+  }
+
   try {
-    if (media_url && media_type) {
-      await sendMedia(instanceName, to, media_url, content ?? "", media_type);
-    } else if (content) {
-      await sendText(instanceName, to, content);
+    if (channelType === "whatsapp") {
+      const instanceName = process.env.EVOLUTION_INSTANCE ?? "atendimento";
+      if (media_url && media_type) {
+        await sendMedia(instanceName, to, media_url, content ?? "", media_type);
+      } else if (content) {
+        await sendText(instanceName, to, content);
+      }
+    } else if (channelType === "instagram" || channelType === "messenger") {
+      // Envio via Meta suporta texto nesta fase; mídia será adicionada depois.
+      if (!content) {
+        return NextResponse.json(
+          { error: { code: "VALIDATION_ERROR", message: "Envio de mídia ainda não suportado neste canal" } },
+          { status: 422 }
+        );
+      }
+      if (channelType === "instagram") {
+        await sendInstagramDirect(to, content);
+      } else {
+        await sendMessengerMessage(to, content);
+      }
     } else {
       return NextResponse.json(
-        { error: { code: "VALIDATION_ERROR", message: "content ou media_url obrigatório" } },
+        { error: { code: "UNSUPPORTED_CHANNEL", message: `Canal "${channelType}" não suporta envio` } },
         { status: 422 }
       );
     }
   } catch (err) {
-    console.error("[messages] Erro ao enviar via Evolution:", err);
+    console.error("[messages] Erro ao enviar mensagem:", err);
     return NextResponse.json(
-      { error: { code: "EVOLUTION_ERROR", message: "Falha ao enviar mensagem" } },
+      { error: { code: "SEND_ERROR", message: "Falha ao enviar mensagem" } },
       { status: 502 }
     );
   }
