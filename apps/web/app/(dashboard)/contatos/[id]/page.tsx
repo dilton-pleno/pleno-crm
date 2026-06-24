@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { MessageCircle, Phone, Mail, Hash, ArrowLeft } from "lucide-react";
+import { getAccessLevel } from "@/lib/permissions";
+import { MessageCircle, Hash, ArrowLeft } from "lucide-react";
+import { ContactEditCard } from "./contact-edit";
 
 const CHANNEL_LABELS: Record<string, string> = {
   whatsapp: "WhatsApp",
@@ -50,6 +52,8 @@ export default async function ContatoPage({ params }: Props) {
 
   if (!contact) notFound();
 
+  const canEdit = getAccessLevel(session.user.role, "contatos") === "full";
+
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-6 max-w-4xl mx-auto">
       {/* Voltar */}
@@ -61,37 +65,15 @@ export default async function ContatoPage({ params }: Props) {
         Voltar para atendimento
       </Link>
 
-      {/* Cabeçalho do contato */}
-      <div className="bg-card border border-border rounded-lg p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold flex-shrink-0">
-            {contact.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-semibold text-foreground">{contact.name}</h1>
-            <div className="flex flex-wrap gap-3 mt-2 text-sm text-muted-foreground">
-              {contact.phone && (
-                <span className="flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5" />
-                  {contact.phone}
-                </span>
-              )}
-              {contact.email && (
-                <span className="flex items-center gap-1">
-                  <Mail className="w-3.5 h-3.5" />
-                  {contact.email}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {contact.notes && (
-          <div className="mt-4 pt-4 border-t border-border">
-            <p className="text-sm text-muted-foreground">{contact.notes}</p>
-          </div>
-        )}
-      </div>
+      {/* Cabeçalho do contato (editável) */}
+      <ContactEditCard
+        id={contact.id}
+        name={contact.name}
+        email={contact.email}
+        phone={contact.phone}
+        notes={contact.notes}
+        canEdit={canEdit}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Coluna principal: histórico de conversas */}
@@ -168,14 +150,14 @@ export default async function ContatoPage({ params }: Props) {
             </div>
           </div>
 
-          {/* Pedidos Wbuy */}
+          {/* Histórico de pedidos */}
           <div className="bg-card border border-border rounded-lg p-4">
             <h2 className="text-sm font-semibold text-foreground mb-3">
-              Pedidos recentes
+              Histórico de pedidos
             </h2>
             {contact.orders.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                Nenhum pedido — Módulo 5 (Wbuy) pendente
+                Integração com e-commerce em breve
               </p>
             ) : (
               <div className="flex flex-col gap-2">

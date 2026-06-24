@@ -7,6 +7,7 @@ type EventName =
   | "message:new"
   | "conversation:assigned"
   | "conversation:status_changed"
+  | "card:moved"
   | "connected";
 
 type EventHandler = (payload: Record<string, unknown>) => void;

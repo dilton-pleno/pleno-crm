@@ -5,7 +5,8 @@ type EventName =
   | "conversation:new"
   | "message:new"
   | "conversation:assigned"
-  | "conversation:status_changed";
+  | "conversation:status_changed"
+  | "card:moved";
 
 interface WsEvent {
   event: EventName;
