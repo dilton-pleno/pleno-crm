@@ -3,10 +3,18 @@
 import { useState, useEffect, useCallback } from "react";
 import { ShoppingCart, CheckCircle2, AlertCircle, Plug, Trash2, RefreshCw } from "lucide-react";
 
+interface ImportStatus {
+  status: "running" | "done" | "error";
+  imported?: number;
+  start?: string;
+  finishedAt?: string;
+}
+
 interface WbuyStatus {
   configured: boolean;
   apiUserMasked: string | null;
   active: boolean;
+  lastImport: ImportStatus | null;
 }
 
 interface Webhook {
@@ -98,6 +106,30 @@ export function WbuyCard() {
       setWorking(false);
     }
   }, []);
+
+  const importHistory = useCallback(async () => {
+    if (!confirm("Importar TODO o histórico de pedidos desde 01/03/2025? Roda em segundo plano.")) {
+      return;
+    }
+    setWorking(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/v1/integrations/wbuy/import-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ start: "2025-03-01" }),
+      });
+      const json = await res.json();
+      setMessage(
+        res.ok
+          ? { kind: "ok", text: "Importação iniciada em segundo plano. Acompanhe abaixo (atualize a página)." }
+          : { kind: "err", text: json.error?.message ?? "Falha ao iniciar importação" }
+      );
+      await fetchStatus();
+    } finally {
+      setWorking(false);
+    }
+  }, [fetchStatus]);
 
   const syncOrders = useCallback(async () => {
     setWorking(true);
@@ -243,6 +275,13 @@ export function WbuyCard() {
                 <ShoppingCart className="w-3.5 h-3.5" /> Sincronizar pedidos
               </button>
               <button
+                onClick={() => void importHistory()}
+                disabled={working}
+                className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
+              >
+                Importar histórico
+              </button>
+              <button
                 onClick={() => void loadWebhooks()}
                 className="text-xs text-muted-foreground hover:underline px-1"
               >
@@ -250,6 +289,17 @@ export function WbuyCard() {
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {status?.lastImport && (
+        <div className="text-[11px] text-muted-foreground border-t border-border pt-2">
+          Importação de histórico:{" "}
+          {status.lastImport.status === "running" && "em andamento…"}
+          {status.lastImport.status === "done" &&
+            `concluída — ${status.lastImport.imported ?? 0} pedidos desde ${status.lastImport.start ?? ""}`}
+          {status.lastImport.status === "error" &&
+            `falhou (importados ${status.lastImport.imported ?? 0})`}
         </div>
       )}
 

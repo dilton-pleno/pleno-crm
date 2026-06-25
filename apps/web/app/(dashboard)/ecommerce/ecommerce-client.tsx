@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ShoppingCart, DollarSign, Package } from "lucide-react";
+import { ShoppingCart, DollarSign, Package, ShoppingBag } from "lucide-react";
 
 interface RecentOrder {
   id: string;
@@ -21,6 +21,20 @@ interface Overview {
   recent: RecentOrder[];
 }
 
+interface AbandonedCarts {
+  count_30d: number;
+  value_30d: number;
+  total_count: number;
+  recovered_count: number;
+  recent: Array<{
+    id: string;
+    customer_name: string | null;
+    items_count: number;
+    total: number;
+    created_at: string;
+  }>;
+}
+
 function fmtCurrency(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -37,16 +51,18 @@ function statusColor(status: string): string {
 
 export function EcommerceClient() {
   const [data, setData] = useState<Overview | null>(null);
+  const [carts, setCarts] = useState<AbandonedCarts | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/ecommerce/overview");
-      if (res.ok) {
-        const json = (await res.json()) as { data: Overview };
-        setData(json.data);
-      }
+      const [ov, ab] = await Promise.all([
+        fetch("/api/v1/ecommerce/overview").then((r) => r.json()),
+        fetch("/api/v1/ecommerce/abandoned-carts").then((r) => r.json()),
+      ]);
+      setData(ov.data ?? null);
+      setCarts(ab.data ?? null);
     } finally {
       setLoading(false);
     }
@@ -112,6 +128,37 @@ export function EcommerceClient() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+
+          {/* Relatório de carrinhos abandonados (só via webhook, sem backfill) */}
+          <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold text-foreground">Carrinhos abandonados</h2>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Stat icon={ShoppingBag} label="Abandonados (30 dias)" value={fmtNumber(carts?.count_30d ?? 0)} />
+              <Stat icon={DollarSign} label="Valor (30 dias)" value={fmtCurrency(carts?.value_30d ?? 0)} />
+              <Stat icon={Package} label="Total registrado" value={fmtNumber(carts?.total_count ?? 0)} />
+              <Stat icon={ShoppingCart} label="Recuperados" value={fmtNumber(carts?.recovered_count ?? 0)} />
+            </div>
+            {!carts || carts.recent.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Nenhum carrinho abandonado registrado ainda. O relatório começa a contar a partir
+                dos webhooks recebidos (a Wbuy não disponibiliza histórico via API).
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {carts.recent.map((c) => (
+                  <div key={c.id} className="flex items-center gap-2 text-xs border-b border-border last:border-0 py-1.5">
+                    <span className="text-foreground truncate flex-1">{c.customer_name ?? "—"}</span>
+                    <span className="text-muted-foreground">{c.items_count} itens</span>
+                    <span className="text-muted-foreground">{new Date(c.created_at).toLocaleDateString("pt-BR")}</span>
+                    <span className="text-foreground w-20 text-right">{fmtCurrency(c.total)}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>

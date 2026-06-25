@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { WbuyOrder } from "@/lib/wbuy";
-import { upsertWbuyOrder, updateWbuyOrderStatus } from "@/lib/wbuy-order";
+import type { WbuyOrder, WbuyAbandonedCart } from "@/lib/wbuy";
+import { upsertWbuyOrder, updateWbuyOrderStatus, upsertAbandonedCart } from "@/lib/wbuy-order";
 
 interface WbuyWebhookPayload {
   lid?: string;
@@ -41,8 +41,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (d.pedido_id) {
           await updateWbuyOrderStatus(d.pedido_id, d.status_nome ?? "—");
         }
+      } else if (payload.type === "abandoned_cart" && payload.data) {
+        await upsertAbandonedCart(payload.data as WbuyAbandonedCart);
       }
-      // customer / abandoned_cart / product: ignorados nesta fase.
+      // customer / product: ignorados nesta fase.
     } catch (err) {
       console.error("[webhook/wbuy] Erro ao processar evento:", err);
     }

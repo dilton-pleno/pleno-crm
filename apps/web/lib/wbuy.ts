@@ -121,6 +121,14 @@ export async function getOrders(
   return request<WbuyOrder[]>(creds, `/order/?${qs.toString()}`);
 }
 
+// Payload de carrinho abandonado (webhook abandoned_cart).
+export interface WbuyAbandonedCart {
+  id_envio?: string;
+  enviar_em?: string;
+  cliente?: { id?: string; nome?: string; email?: string; telefone?: string };
+  produtos?: Array<{ produto?: string; valor?: string; quantidade?: string }>;
+}
+
 export async function getOrderById(creds: WbuyCreds, id: string): Promise<WbuyOrder | null> {
   const data = await request<WbuyOrder[] | WbuyOrder>(creds, `/order/${id}`);
   return Array.isArray(data) ? data[0] ?? null : data;
