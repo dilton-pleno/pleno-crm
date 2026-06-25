@@ -8,6 +8,8 @@ type EventName =
   | "conversation:assigned"
   | "conversation:status_changed"
   | "card:moved"
+  | "integration:reconnect_requested"
+  | "integration:qr_code"
   | "connected";
 
 type EventHandler = (payload: Record<string, unknown>) => void;

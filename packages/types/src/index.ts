@@ -57,4 +57,5 @@ export type Module =
   | "campanhas"
   | "alertas"
   | "automacoes"
+  | "integracoes"
   | "configuracoes";

@@ -9,6 +9,7 @@ const PERMISSION_MATRIX: Record<Module, Record<Role, AccessLevel>> = {
   campanhas:      { ADMIN: "full", GESTOR: "read",    ATENDENTE: "none"    },
   alertas:        { ADMIN: "full", GESTOR: "request", ATENDENTE: "none"    },
   automacoes:     { ADMIN: "full", GESTOR: "request", ATENDENTE: "none"    },
+  integracoes:    { ADMIN: "full", GESTOR: "full",    ATENDENTE: "request" },
   configuracoes:  { ADMIN: "full", GESTOR: "none",    ATENDENTE: "none"    },
 };
 

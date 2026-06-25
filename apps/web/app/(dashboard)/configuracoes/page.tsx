@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { SlidersHorizontal, Zap, Users, ChevronRight } from "lucide-react";
+import { SlidersHorizontal, Zap, Users, Plug, ChevronRight } from "lucide-react";
 
 export default async function ConfiguracoesPage() {
   const session = await auth();
@@ -14,6 +14,12 @@ export default async function ConfiguracoesPage() {
       icon: Users,
       title: "Usuários",
       description: "Gerenciar usuários, papéis e acesso",
+    },
+    {
+      href: "/configuracoes/integracoes",
+      icon: Plug,
+      title: "Integrações",
+      description: "Conexão do WhatsApp e demais serviços",
     },
     {
       href: "/configuracoes/pipeline",
