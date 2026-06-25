@@ -49,10 +49,18 @@ function statusColor(status: string): string {
   return "bg-muted text-muted-foreground";
 }
 
+const PER_PAGE = 20;
+
 export function EcommerceClient() {
   const [data, setData] = useState<Overview | null>(null);
   const [carts, setCarts] = useState<AbandonedCarts | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [orders, setOrders] = useState<RecentOrder[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -68,9 +76,26 @@ export function EcommerceClient() {
     }
   }, []);
 
+  const fetchOrders = useCallback(async () => {
+    const qs = new URLSearchParams({ page: String(page), limit: String(PER_PAGE) });
+    if (search) qs.set("search", search);
+    const res = await fetch(`/api/v1/ecommerce/orders?${qs.toString()}`);
+    if (res.ok) {
+      const json = (await res.json()) as { data: RecentOrder[]; meta: { total: number } };
+      setOrders(json.data);
+      setTotal(json.meta.total);
+    }
+  }, [page, search]);
+
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    void fetchOrders();
+  }, [fetchOrders]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-5 max-w-5xl mx-auto w-full">
@@ -87,12 +112,28 @@ export function EcommerceClient() {
           </div>
 
           <div className="bg-card border border-border rounded-lg overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-border">
-              <h2 className="text-sm font-semibold text-foreground">Pedidos recentes</h2>
+            <div className="px-4 py-2.5 border-b border-border flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-foreground">
+                Pedidos <span className="text-muted-foreground font-normal">({fmtNumber(total)})</span>
+              </h2>
+              <input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setPage(1);
+                    setSearch(searchInput.trim());
+                  }
+                }}
+                placeholder="Buscar por cliente ou nº do pedido…"
+                className="text-xs bg-background border border-border rounded-md px-3 py-1.5 w-64 focus:outline-none focus:ring-1 focus:ring-ring"
+              />
             </div>
-            {!data || data.recent.length === 0 ? (
+            {orders.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-10">
-                Nenhum pedido sincronizado. Use “Sincronizar pedidos” em Configurações → Integrações.
+                {search
+                  ? "Nenhum pedido encontrado para a busca."
+                  : "Nenhum pedido sincronizado. Use “Importar histórico” em Configurações → Integrações."}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -107,7 +148,7 @@ export function EcommerceClient() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.recent.map((o) => (
+                    {orders.map((o) => (
                       <tr key={o.id} className="border-b border-border last:border-0 hover:bg-accent/40">
                         <td className="px-4 py-2 text-foreground">#{o.external_id}</td>
                         <td className="px-4 py-2">
@@ -128,6 +169,27 @@ export function EcommerceClient() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-end gap-2 px-4 py-2.5 border-t border-border">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="text-xs px-2 py-1 rounded hover:bg-accent disabled:opacity-40"
+                >
+                  Anterior
+                </button>
+                <span className="text-xs text-muted-foreground">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="text-xs px-2 py-1 rounded hover:bg-accent disabled:opacity-40"
+                >
+                  Próxima
+                </button>
               </div>
             )}
           </div>
