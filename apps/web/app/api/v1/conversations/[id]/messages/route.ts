@@ -22,10 +22,22 @@ export async function GET(
   const messages = await prisma.message.findMany({
     where: { conversationId: id },
     orderBy: { sentAt: "asc" },
+    // mediaData (bytes) é pesado e não deve ir na listagem; é servido sob
+    // demanda pela rota /api/v1/messages/[id]/media. Selecionamos só a flag.
+    omit: { mediaData: true },
     include: {
       sender: { select: { id: true, name: true } },
     },
   });
+
+  // Ids das mensagens com bytes armazenados (mídia do WhatsApp via Evolution),
+  // sem carregar os bytes em si. Essas são servidas pela rota de proxy; as
+  // demais (ex.: Instagram) seguem usando a URL externa em mediaUrl.
+  const withStoredMedia = await prisma.message.findMany({
+    where: { conversationId: id, mediaData: { not: null } },
+    select: { id: true },
+  });
+  const storedMediaIds = new Set(withStoredMedia.map((m) => m.id));
 
   // Mark incoming messages as read
   await prisma.message.updateMany({
@@ -37,8 +49,11 @@ export async function GET(
     id: m.id,
     direction: m.direction,
     content: m.content,
-    media_url: m.mediaUrl,
+    media_url: storedMediaIds.has(m.id)
+      ? `/api/v1/messages/${m.id}/media`
+      : m.mediaUrl,
     media_type: m.mediaType,
+    media_file_name: m.mediaFileName,
     sent_at: m.sentAt.toISOString(),
     delivered_at: m.deliveredAt?.toISOString() ?? null,
     read_at: m.readAt?.toISOString() ?? null,

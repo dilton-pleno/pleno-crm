@@ -15,6 +15,10 @@ export interface InboundMessage {
   content: string | null;
   mediaUrl?: string | null;
   mediaType?: MediaType | null;
+  /** Bytes da mídia já descriptografada (WhatsApp via Evolution) */
+  mediaData?: Uint8Array<ArrayBuffer> | null;
+  mediaMimeType?: string | null;
+  mediaFileName?: string | null;
   sentAt: Date;
   /** Rótulo da inbox exibido na UI (ex.: "WhatsApp", "Instagram") */
   inboxName: string;
@@ -105,6 +109,9 @@ export async function ingestInboundMessage(msg: InboundMessage): Promise<void> {
       content: msg.content,
       mediaUrl: msg.mediaUrl ?? null,
       mediaType: msg.mediaType ?? null,
+      mediaData: msg.mediaData ?? null,
+      mediaMimeType: msg.mediaMimeType ?? null,
+      mediaFileName: msg.mediaFileName ?? null,
       externalId: msg.externalId,
       sentAt: msg.sentAt,
     },
