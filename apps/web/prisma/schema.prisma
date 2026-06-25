@@ -34,7 +34,25 @@ model User {
   alerts                Alert[]        @relation("CreatedBy")
   automations           Automation[]   @relation("CreatedBy")
 
+  integrationRequestsMade     IntegrationRequest[] @relation("RequestedBy")
+  integrationRequestsApproved IntegrationRequest[] @relation("ApprovedBy")
+
   @@map("users")
+}
+
+model IntegrationRequest {
+  id          String   @id @default(uuid())
+  type        String // "whatsapp_reconnect"
+  requestedBy String   @map("requested_by")
+  approvedBy  String?  @map("approved_by")
+  status      String   @default("pending") // "pending" | "approved" | "rejected"
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  requester User  @relation("RequestedBy", fields: [requestedBy], references: [id])
+  approver  User? @relation("ApprovedBy", fields: [approvedBy], references: [id])
+
+  @@map("integration_requests")
 }
 
 // ============================================================
