@@ -2,10 +2,12 @@ import Link from "next/link";
 import { canAccess } from "@/lib/permissions";
 import type { Role, Module } from "@pleno-crm/types";
 import {
+  LayoutDashboard,
   MessageCircle,
   MessageSquare,
   LayoutGrid,
   BarChart2,
+  ShoppingCart,
   Users,
   Settings,
   Zap,
@@ -17,16 +19,21 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   module: Module;
+  /** Restringe o item a papéis específicos (além da permissão do módulo). */
+  roles?: Role[];
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { label: "Visão geral",  href: "/visao-geral", icon: LayoutDashboard, module: "visao_geral" },
   { label: "Atendimento", href: "/atendimento", icon: MessageCircle, module: "atendimento" },
   { label: "Comentários", href: "/atendimento/comentarios", icon: MessageSquare, module: "atendimento" },
   { label: "Kanban",      href: "/kanban",      icon: LayoutGrid,    module: "kanban"      },
   { label: "Contatos",    href: "/contatos",    icon: Users,         module: "contatos"    },
   { label: "Campanhas",   href: "/campanhas",   icon: BarChart2,     module: "campanhas"   },
+  { label: "Ecommerce",   href: "/ecommerce",   icon: ShoppingCart,  module: "ecommerce"   },
   { label: "Automações",  href: "/configuracoes/automacoes", icon: Zap, module: "automacoes" },
-  { label: "Integrações", href: "/configuracoes/integracoes", icon: Plug, module: "integracoes" },
+  // Integrações fica só para Gestor/Atendente: o Admin acessa por Configurações.
+  { label: "Integrações", href: "/configuracoes/integracoes", icon: Plug, module: "integracoes", roles: ["GESTOR", "ATENDENTE"] },
   { label: "Configurações", href: "/configuracoes", icon: Settings,  module: "configuracoes" },
 ];
 
@@ -36,7 +43,9 @@ interface SidebarProps {
 }
 
 export function Sidebar({ role, currentPath }: SidebarProps) {
-  const visibleItems = NAV_ITEMS.filter((item) => canAccess(role, item.module));
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => canAccess(role, item.module) && (!item.roles || item.roles.includes(role))
+  );
 
   // Destaca apenas o item mais específico (href mais longo) que casa com a rota,
   // evitando que "/atendimento" e "/atendimento/comentarios" fiquem ativos juntos.

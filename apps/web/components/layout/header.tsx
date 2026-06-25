@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { Role } from "@pleno-crm/types";
@@ -17,6 +17,8 @@ interface Notification {
   id: string;
   message: string;
   href: string;
+  /** "alert" = persistida (precisa marcar lida na API); "ephemeral" = só local */
+  kind: "alert" | "ephemeral";
 }
 
 interface HeaderProps {
@@ -29,8 +31,36 @@ export function Header({ userName, userRole }: HeaderProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
 
-  // Apenas Admin e Gestor recebem alertas de solicitação de reconexão.
+  // Apenas Admin e Gestor recebem alertas de reconexão e de campanhas.
   const canApprove = userRole === "ADMIN" || userRole === "GESTOR";
+
+  // Carrega notificações de alerta persistidas (não lidas).
+  const loadAlertNotifications = useCallback(async () => {
+    if (!canApprove) return;
+    try {
+      const res = await fetch("/api/v1/alerts/notifications");
+      if (!res.ok) return;
+      const json = (await res.json()) as {
+        data: Array<{ id: string; message: string }>;
+      };
+      setNotifications((prev) => {
+        const ephemeral = prev.filter((n) => n.kind === "ephemeral");
+        const alerts: Notification[] = json.data.map((n) => ({
+          id: n.id,
+          message: n.message,
+          href: "/campanhas/alertas",
+          kind: "alert" as const,
+        }));
+        return [...alerts, ...ephemeral];
+      });
+    } catch {
+      // silencioso
+    }
+  }, [canApprove]);
+
+  useEffect(() => {
+    void loadAlertNotifications();
+  }, [loadAlertNotifications]);
 
   useWebSocket({
     "integration:reconnect_requested": (payload) => {
@@ -45,10 +75,15 @@ export function Header({ userName, userRole }: HeaderProps) {
             id: requestId,
             message: `Solicitação de reconexão WhatsApp de ${requesterName}`,
             href: "/configuracoes/integracoes",
+            kind: "ephemeral",
           },
           ...prev,
         ];
       });
+    },
+    "alert:triggered": () => {
+      if (!canApprove) return;
+      void loadAlertNotifications();
     },
   });
 
@@ -56,6 +91,12 @@ export function Header({ userName, userRole }: HeaderProps) {
     (notification: Notification) => {
       setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
       setOpen(false);
+      // Notificações de alerta são persistidas: marca como lida na API.
+      if (notification.kind === "alert") {
+        void fetch(`/api/v1/alerts/notifications/${notification.id}/read`, {
+          method: "PATCH",
+        });
+      }
       router.push(notification.href);
     },
     [router]
