@@ -70,7 +70,7 @@ export async function GET(): Promise<NextResponse> {
       _sum: { total: true },
     });
     ecommerce = {
-      integrated: false,
+      integrated: ordersAgg._count.id > 0,
       orders: ordersAgg._count.id,
       revenue: ordersAgg._sum.total ? dec(ordersAgg._sum.total) : 0,
     };

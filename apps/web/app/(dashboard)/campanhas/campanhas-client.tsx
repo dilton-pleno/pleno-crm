@@ -92,6 +92,7 @@ export function CampanhasClient() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [ga4, setGa4] = useState<Ga4Data | null>(null);
+  const [revenue, setRevenue] = useState<{ total_revenue: number; order_count: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [sort, setSort] = useState<{ key: string; order: "asc" | "desc" }>({ key: "spend", order: "desc" });
@@ -104,14 +105,16 @@ export function CampanhasClient() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [ov, camp, g4] = await Promise.all([
+      const [ov, camp, g4, rev] = await Promise.all([
         fetch(`/api/v1/analytics/overview?${qs}&compare=${compare}`).then((r) => r.json()),
         fetch(`/api/v1/analytics/campaigns?${qs}&sort=${sort.key}&order=${sort.order}&limit=100`).then((r) => r.json()),
         fetch(`/api/v1/analytics/ga4?${qs}`).then((r) => r.json()),
+        fetch(`/api/v1/analytics/revenue?${qs}`).then((r) => r.json()),
       ]);
       setOverview(ov.data ?? null);
       setCampaigns(camp.data ?? []);
       setGa4(g4.data ?? null);
+      setRevenue(rev.data ?? null);
     } finally {
       setLoading(false);
     }
@@ -183,6 +186,15 @@ export function CampanhasClient() {
             <MetricCard label="CTR médio" value={`${(overview?.metrics.avg_ctr ?? 0).toFixed(2)}%`} />
             <MetricCard label="ROAS" value={`${(overview?.metrics.avg_roas ?? 0).toFixed(2)}x`} />
           </div>
+
+          {/* Faturamento (Wbuy) × Investimento + ROI */}
+          {revenue && (
+            <RevenueRoi
+              revenue={revenue.total_revenue}
+              orders={revenue.order_count}
+              spend={overview?.metrics.total_spend ?? 0}
+            />
+          )}
 
           {/* Gráficos */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -296,6 +308,34 @@ function PeriodSelector({
         onChange={(e) => onCustom(range.start, e.target.value)}
         className="text-xs bg-card border border-border rounded-md px-2 py-1.5"
       />
+    </div>
+  );
+}
+
+function RevenueRoi({ revenue, orders, spend }: { revenue: number; orders: number; spend: number }) {
+  const roi = spend > 0 ? ((revenue - spend) / spend) * 100 : 0;
+  return (
+    <div className="bg-card border border-border rounded-lg p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[11px] text-muted-foreground">Faturamento (Wbuy)</span>
+        <span className="text-base font-semibold text-foreground">{fmtCurrency(revenue)}</span>
+        <span className="text-[10px] text-muted-foreground">{fmtNumber(orders)} pedidos</span>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[11px] text-muted-foreground">Investimento (Meta + Google)</span>
+        <span className="text-base font-semibold text-foreground">{fmtCurrency(spend)}</span>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[11px] text-muted-foreground">Resultado</span>
+        <span className="text-base font-semibold text-foreground">{fmtCurrency(revenue - spend)}</span>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[11px] text-muted-foreground">ROI</span>
+        <span className={`text-base font-semibold ${roi >= 0 ? "text-green-600" : "text-red-600"}`}>
+          {roi >= 0 ? "+" : ""}
+          {roi.toFixed(1)}%
+        </span>
+      </div>
     </div>
   );
 }
