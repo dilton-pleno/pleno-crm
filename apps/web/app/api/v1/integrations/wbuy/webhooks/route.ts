@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
 import { getWbuyCreds } from "@/lib/wbuy-config";
-import { listWebhooks, registerWebhook, WBUY_ORDER_EVENTS } from "@/lib/wbuy";
+import { listWebhooks, registerWebhook, WBUY_WEBHOOK_TYPES } from "@/lib/wbuy";
 
 function callbackUrl(): string {
   const base = process.env.NEXTAUTH_URL ?? "";
@@ -47,17 +47,17 @@ export async function POST(): Promise<NextResponse> {
   }
 
   const url = callbackUrl();
-  const results: Array<{ evento: string; ok: boolean }> = [];
+  const results: Array<{ type: string; ok: boolean }> = [];
 
-  // Registra um webhook por evento de pedido. Falhas individuais (ex.: já
+  // Registra um webhook por tipo (módulo). Falhas individuais (ex.: já
   // existe) não abortam o processo.
-  for (const evento of WBUY_ORDER_EVENTS) {
+  for (const type of WBUY_WEBHOOK_TYPES) {
     try {
-      await registerWebhook(creds, url, evento);
-      results.push({ evento, ok: true });
+      await registerWebhook(creds, url, type);
+      results.push({ type, ok: true });
     } catch (err) {
-      console.error(`[wbuy] Falha ao registrar webhook ${evento}:`, err);
-      results.push({ evento, ok: false });
+      console.error(`[wbuy] Falha ao registrar webhook ${type}:`, err);
+      results.push({ type, ok: false });
     }
   }
 
