@@ -105,13 +105,13 @@ export function EcommerceClient() {
         <p className="text-sm text-muted-foreground py-12 text-center">Carregando...</p>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 shrink-0">
             <Stat icon={DollarSign} label="Faturamento (30 dias)" value={fmtCurrency(data?.revenue_30d ?? 0)} />
             <Stat icon={ShoppingCart} label="Pedidos (30 dias)" value={fmtNumber(data?.orders_30d ?? 0)} />
             <Stat icon={Package} label="Pedidos no total" value={fmtNumber(data?.total_orders ?? 0)} />
           </div>
 
-          <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="bg-card border border-border rounded-lg overflow-hidden shrink-0">
             <div className="px-4 py-2.5 border-b border-border flex items-center justify-between gap-3 flex-wrap">
               <h2 className="text-sm font-semibold text-foreground">
                 Pedidos <span className="text-muted-foreground font-normal">({fmtNumber(total)})</span>
@@ -216,7 +216,7 @@ export function EcommerceClient() {
           </div>
 
           {/* Relatório de carrinhos abandonados (só via webhook, sem backfill) */}
-          <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-3">
+          <div className="bg-card border border-border rounded-lg p-4 flex flex-col gap-3 shrink-0">
             <div className="flex items-center gap-2">
               <ShoppingBag className="w-4 h-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold text-foreground">Carrinhos abandonados</h2>
