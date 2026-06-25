@@ -150,6 +150,9 @@ model Message {
   content        String?
   mediaUrl       String?          @map("media_url")
   mediaType      MediaType?       @map("media_type")
+  mediaData      Bytes?           @map("media_data")
+  mediaMimeType  String?          @map("media_mime_type")
+  mediaFileName  String?          @map("media_file_name")
   externalId     String?          @map("external_id")
   senderId       String?          @map("sender_id")
   sentAt         DateTime         @default(now()) @map("sent_at")

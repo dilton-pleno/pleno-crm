@@ -10,6 +10,7 @@ interface MessageItem {
   content: string | null;
   media_url: string | null;
   media_type: "image" | "audio" | "document" | "sticker" | "video" | null;
+  media_file_name?: string | null;
   sent_at: string;
   delivered_at: string | null;
   read_at: string | null;
@@ -55,6 +56,14 @@ function MediaContent({ msg }: { msg: MessageItem }) {
     );
   }
 
+  if (msg.media_type === "video") {
+    return (
+      <div className="mt-1 rounded overflow-hidden max-w-[260px]">
+        <video controls src={msg.media_url} className="rounded max-h-[260px] w-full" />
+      </div>
+    );
+  }
+
   if (msg.media_type === "audio") {
     return (
       <div className="flex items-center gap-2 mt-1 bg-black/10 rounded-lg px-3 py-2">
@@ -72,8 +81,10 @@ function MediaContent({ msg }: { msg: MessageItem }) {
         rel="noopener noreferrer"
         className="flex items-center gap-2 mt-1 bg-black/10 rounded-lg px-3 py-2 text-sm hover:bg-black/20 transition-colors"
       >
-        <FileText className="w-4 h-4" />
-        {msg.content ?? "Documento"}
+        <FileText className="w-4 h-4 flex-shrink-0" />
+        <span className="truncate max-w-[200px]">
+          {msg.media_file_name ?? msg.content ?? "Documento"}
+        </span>
       </a>
     );
   }

@@ -163,6 +163,59 @@ export async function logoutInstance(instanceName: string): Promise<void> {
   }
 }
 
+export interface MediaPayload {
+  /** Bytes da mídia já descriptografada */
+  data: Uint8Array<ArrayBuffer>;
+  mimeType: string | null;
+  fileName: string | null;
+}
+
+interface RawBase64Response {
+  base64?: string;
+  mimetype?: string;
+  fileName?: string;
+}
+
+/**
+ * Baixa e descriptografa a mídia de uma mensagem recebida via
+ * POST /chat/getBase64FromMediaMessage/{instance}.
+ *
+ * A `url` que o WhatsApp entrega no webhook é criptografada e inutilizável
+ * diretamente; este endpoint do Evolution devolve os bytes reais em base64,
+ * que convertemos para Buffer. Retorna null se a mídia não puder ser obtida.
+ */
+export async function getBase64FromMediaMessage(
+  instanceName: string,
+  messageKey: { remoteJid: string; fromMe: boolean; id: string }
+): Promise<MediaPayload | null> {
+  const res = await fetch(
+    `${baseUrl()}/chat/getBase64FromMediaMessage/${instanceName}`,
+    {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ message: { key: messageKey } }),
+    }
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(
+      `Evolution getBase64FromMediaMessage falhou [${res.status}]: ${body}`
+    );
+  }
+
+  const data = (await res.json()) as RawBase64Response;
+  if (!data.base64) return null;
+
+  // Uint8Array com ArrayBuffer próprio (Prisma Bytes não aceita o Buffer do
+  // Node por causa do generic ArrayBufferLike).
+  return {
+    data: Uint8Array.from(Buffer.from(data.base64, "base64")),
+    mimeType: data.mimetype ?? null,
+    fileName: data.fileName ?? null,
+  };
+}
+
 export async function sendMedia(
   instanceName: string,
   to: string,
