@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { WbuyOrder } from "@/lib/wbuy";
+import { upsertWbuyOrder, updateWbuyOrderStatus } from "@/lib/wbuy-order";
 
-// Receiver de webhooks da Wbuy (eventos de pedido/pagamento). O secret vai na
-// query porque a Wbuy não envia headers custom. Fase 1: valida e responde 200;
-// o processamento dos pedidos entra na Fase 2.
+interface WbuyWebhookPayload {
+  lid?: string;
+  type?: string;
+  method?: string;
+  data?: unknown;
+}
+
+interface OrderStatusData {
+  pedido_id?: string;
+  status_nome?: string;
+}
+
+// Receiver de webhooks da Wbuy. O secret vai na query porque a Wbuy não envia
+// headers custom. Responde 200 rápido (a Wbuy desabilita webhooks que não
+// retornam 200/201) e processa de forma assíncrona.
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const secret = request.nextUrl.searchParams.get("secret");
   if (!secret || secret !== process.env.INTERNAL_API_SECRET) {
@@ -12,11 +26,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  const payload = (await request.json()) as WbuyWebhookPayload;
+
   if (process.env.WEBHOOK_DEBUG === "true") {
-    const payload = await request.text();
-    console.log("[webhook/wbuy] Payload recebido:", payload);
+    console.log("[webhook/wbuy] Payload recebido:", JSON.stringify(payload));
   }
 
-  // TODO (Fase 2): processar evento de pedido (upsert Order + status).
+  setImmediate(async () => {
+    try {
+      if (payload.type === "order" && payload.data) {
+        await upsertWbuyOrder(payload.data as WbuyOrder);
+      } else if (payload.type === "order_status" && payload.data) {
+        const d = payload.data as OrderStatusData;
+        if (d.pedido_id) {
+          await updateWbuyOrderStatus(d.pedido_id, d.status_nome ?? "—");
+        }
+      }
+      // customer / abandoned_cart / product: ignorados nesta fase.
+    } catch (err) {
+      console.error("[webhook/wbuy] Erro ao processar evento:", err);
+    }
+  });
+
   return NextResponse.json({ ok: true }, { status: 200 });
 }
