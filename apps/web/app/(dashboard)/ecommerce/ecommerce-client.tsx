@@ -112,22 +112,43 @@ export function EcommerceClient() {
           </div>
 
           <div className="bg-card border border-border rounded-lg overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-border flex items-center justify-between gap-3">
+            <div className="px-4 py-2.5 border-b border-border flex items-center justify-between gap-3 flex-wrap">
               <h2 className="text-sm font-semibold text-foreground">
                 Pedidos <span className="text-muted-foreground font-normal">({fmtNumber(total)})</span>
               </h2>
-              <input
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    setPage(1);
-                    setSearch(searchInput.trim());
-                  }
-                }}
-                placeholder="Buscar por cliente ou nº do pedido…"
-                className="text-xs bg-background border border-border rounded-md px-3 py-1.5 w-64 focus:outline-none focus:ring-1 focus:ring-ring"
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setPage(1);
+                      setSearch(searchInput.trim());
+                    }
+                  }}
+                  placeholder="Buscar por cliente ou nº do pedido…"
+                  className="text-xs bg-background border border-border rounded-md px-3 py-1.5 w-56 focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="text-xs border border-border rounded-md px-2 py-1.5 hover:bg-accent disabled:opacity-40"
+                  >
+                    ‹
+                  </button>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap px-1">
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="text-xs border border-border rounded-md px-2 py-1.5 hover:bg-accent disabled:opacity-40"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
             </div>
             {orders.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-10">
