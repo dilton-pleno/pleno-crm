@@ -18,6 +18,7 @@ export default async function IntegracoesPage() {
     <IntegracoesClient
       currentUserId={session.user.id}
       canManage={canManage}
+      isAdmin={role === "ADMIN"}
     />
   );
 }

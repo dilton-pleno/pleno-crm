@@ -1,0 +1,135 @@
+// Cliente da Wbuy REST API (https://sistema.sistemawbuy.com.br/api/v1).
+// Auth: Authorization: Bearer base64(usuario_api:senha_api).
+// As credenciais são passadas como argumento (vêm de IntegrationConfig,
+// cifradas). Inclui backoff em 429 (rate limit 100 req / 60s).
+
+export interface WbuyCreds {
+  user: string;
+  secret: string;
+}
+
+export interface WbuyWebhook {
+  id: string;
+  url: string;
+  evento: string;
+}
+
+// Eventos de pedido/pagamento que fazem sentido para o CRM (os webhooks da
+// Wbuy são focados no ciclo do pedido). Ajustar conforme o painel real.
+export const WBUY_ORDER_EVENTS = [
+  "pedido_aprovado",
+  "pedido_autorizado",
+  "pedido_pago",
+  "pedido_estornado",
+  "pagamento_nao_autorizado",
+] as const;
+
+function baseUrl(): string {
+  return (process.env.WBUY_API_URL || "https://sistema.sistemawbuy.com.br/api/v1").replace(/\/$/, "");
+}
+
+function authHeader(creds: WbuyCreds): string {
+  return "Bearer " + Buffer.from(`${creds.user}:${creds.secret}`).toString("base64");
+}
+
+interface WbuyEnvelope<T> {
+  code?: string;
+  message?: string;
+  responseCode?: string;
+  data?: T;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Requisição base à Wbuy. Trata o envelope { data } e faz retry com backoff
+ * exponencial em HTTP 429 (rate limit). Lança erro nos demais status >= 400.
+ */
+async function request<T>(
+  creds: WbuyCreds,
+  path: string,
+  init: RequestInit = {},
+  attempt = 0
+): Promise<T> {
+  const res = await fetch(`${baseUrl()}${path}`, {
+    ...init,
+    headers: {
+      Authorization: authHeader(creds),
+      "Content-Type": "application/json",
+      "User-Agent": "PlenoCRM/1.0 (agencia@pleno.dev.br)",
+      ...(init.headers ?? {}),
+    },
+  });
+
+  if (res.status === 429 && attempt < 3) {
+    const retryAfter = Number(res.headers.get("retry-after")) || 2 ** attempt;
+    await sleep(retryAfter * 1000);
+    return request<T>(creds, path, init, attempt + 1);
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Wbuy ${path} falhou [${res.status}]: ${body}`);
+  }
+
+  const json = (await res.json()) as WbuyEnvelope<T>;
+  return (json.data ?? ([] as unknown)) as T;
+}
+
+/**
+ * Testa as credenciais com uma chamada leve. Retorna true se autenticou.
+ */
+export async function testConnection(creds: WbuyCreds): Promise<boolean> {
+  await request(creds, "/customer/?limit=0,1");
+  return true;
+}
+
+export interface WbuyOrder {
+  id: string;
+  status?: string;
+  valor?: string | number;
+  cliente?: {
+    nome?: string;
+    email?: string;
+    telefone1?: string;
+    telefone2?: string;
+  };
+  produtos?: Array<{ nome?: string; quantidade?: number; valor?: string | number }>;
+  data?: string;
+}
+
+export async function getOrders(
+  creds: WbuyCreds,
+  params: { data_inicial?: string; data_final?: string; status?: string; limit?: string } = {}
+): Promise<WbuyOrder[]> {
+  const qs = new URLSearchParams();
+  if (params.data_inicial) qs.set("data_inicial", params.data_inicial);
+  if (params.data_final) qs.set("data_final", params.data_final);
+  if (params.status) qs.set("status", params.status);
+  qs.set("limit", params.limit ?? "0,100");
+  return request<WbuyOrder[]>(creds, `/order/?${qs.toString()}`);
+}
+
+export async function getOrderById(creds: WbuyCreds, id: string): Promise<WbuyOrder | null> {
+  const data = await request<WbuyOrder[] | WbuyOrder>(creds, `/order/${id}`);
+  return Array.isArray(data) ? data[0] ?? null : data;
+}
+
+export async function listWebhooks(creds: WbuyCreds): Promise<WbuyWebhook[]> {
+  return request<WbuyWebhook[]>(creds, "/webhook/");
+}
+
+export async function registerWebhook(
+  creds: WbuyCreds,
+  url: string,
+  evento: string
+): Promise<void> {
+  await request(creds, "/webhook", {
+    method: "POST",
+    body: JSON.stringify({ url, evento }),
+  });
+}
+
+export async function deleteWebhook(creds: WbuyCreds, id: string): Promise<void> {
+  await request(creds, `/webhook/${id}`, { method: "DELETE" });
+}
