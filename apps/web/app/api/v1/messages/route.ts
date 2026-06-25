@@ -51,13 +51,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // ID da mensagem no canal externo (key.id do Evolution), guardado para
+  // deduplicar o eco fromMe que o webhook do WhatsApp devolve.
+  let externalId: string | null = null;
+
   try {
     if (channelType === "whatsapp") {
       const instanceName = process.env.EVOLUTION_INSTANCE ?? "atendimento";
       if (media_url && media_type) {
-        await sendMedia(instanceName, to, media_url, content ?? "", media_type);
+        const result = await sendMedia(instanceName, to, media_url, content ?? "", media_type);
+        externalId = result.key?.id ?? null;
       } else if (content) {
-        await sendText(instanceName, to, content);
+        const result = await sendText(instanceName, to, content);
+        externalId = result.key?.id ?? null;
       }
     } else if (channelType === "instagram" || channelType === "messenger") {
       // Envio via Meta suporta texto nesta fase; mídia será adicionada depois.
@@ -94,6 +100,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       mediaUrl: media_url ?? null,
       mediaType: media_type ?? null,
       senderId: session.user.id,
+      externalId,
     },
   });
 
