@@ -19,6 +19,7 @@ interface MessageUpsertData {
   };
   message?: {
     conversation?: string;
+    extendedTextMessage?: { text?: string };
     imageMessage?: { caption?: string; url?: string };
     audioMessage?: { url?: string };
     documentMessage?: { url?: string; title?: string; fileName?: string; caption?: string };
@@ -57,6 +58,9 @@ function extractMediaInfo(data: MessageUpsertData): {
   if (msg.conversation) {
     return { content: msg.conversation, mediaUrl: null, mediaType: null, fileName: null };
   }
+  if (msg.extendedTextMessage?.text) {
+    return { content: msg.extendedTextMessage.text, mediaUrl: null, mediaType: null, fileName: null };
+  }
   if (msg.imageMessage) {
     return { content: msg.imageMessage.caption ?? null, mediaUrl: msg.imageMessage.url ?? null, mediaType: "image", fileName: null };
   }
@@ -77,10 +81,25 @@ function extractMediaInfo(data: MessageUpsertData): {
 }
 
 async function handleMessageUpsert(data: MessageUpsertData): Promise<void> {
-  if (data.key.fromMe) return;
+  // fromMe = mensagem enviada pelo próprio número, inclusive respostas feitas
+  // direto pelo app do WhatsApp no celular. Ingerimos como "out" para o
+  // histórico ficar completo; o eco das mensagens enviadas pelo CRM é
+  // deduplicado pelo externalId.
+  const direction: "in" | "out" = data.key.fromMe ? "out" : "in";
 
   const phone = extractPhone(data.key.remoteJid);
   const { content, mediaUrl, mediaType, fileName } = extractMediaInfo(data);
+
+  // Ignora ecos sem conteúdo aproveitável (ex.: mensagens de protocolo).
+  if (!content && !mediaType) return;
+
+  // Dedup antecipada: se a mensagem já existe (ex.: eco de envio do próprio
+  // CRM), evita baixar mídia e reprocessar à toa.
+  const already = await prisma.message.findFirst({
+    where: { externalId: data.key.id },
+    select: { id: true },
+  });
+  if (already) return;
 
   // Mídia: a URL do WhatsApp é criptografada, então baixamos os bytes reais
   // pelo Evolution. Se falhar, a mensagem é salva mesmo assim (sem a mídia),
@@ -109,12 +128,17 @@ async function handleMessageUpsert(data: MessageUpsertData): Promise<void> {
     }
   }
 
+  // Em fromMe o pushName é o nome do próprio operador, não do contato; nesse
+  // caso usamos o telefone como nome ao criar um contato novo.
+  const contactName = data.key.fromMe ? phone : data.pushName ?? phone;
+
   await ingestInboundMessage({
     channelType: "whatsapp",
     channelIdentifier: phone,
-    contactName: data.pushName ?? phone,
+    contactName,
     phone,
     externalId: data.key.id,
+    direction,
     content,
     mediaUrl,
     mediaType,

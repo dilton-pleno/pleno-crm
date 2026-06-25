@@ -1,4 +1,4 @@
-import type { ChannelType, MediaType } from "@prisma/client";
+import type { ChannelType, MediaType, MessageDirection } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { emitEvent } from "@/lib/websocket";
 
@@ -12,6 +12,12 @@ export interface InboundMessage {
   phone?: string | null;
   /** ID externo da mensagem para deduplicação (key.id / mid) */
   externalId: string;
+  /**
+   * Direção da mensagem. "in" (padrão) = recebida do contato; "out" = enviada
+   * pelo operador, inclusive respostas feitas direto pelo app do WhatsApp no
+   * celular (fromMe), que o webhook ecoa.
+   */
+  direction?: MessageDirection;
   content: string | null;
   mediaUrl?: string | null;
   mediaType?: MediaType | null;
@@ -102,10 +108,12 @@ export async function ingestInboundMessage(msg: InboundMessage): Promise<void> {
   const existing = await prisma.message.findFirst({ where: { externalId: msg.externalId } });
   if (existing) return;
 
+  const direction = msg.direction ?? "in";
+
   const message = await prisma.message.create({
     data: {
       conversationId: conversation.id,
-      direction: "in",
+      direction,
       content: msg.content,
       mediaUrl: msg.mediaUrl ?? null,
       mediaType: msg.mediaType ?? null,
@@ -116,6 +124,16 @@ export async function ingestInboundMessage(msg: InboundMessage): Promise<void> {
       sentAt: msg.sentAt,
     },
   });
+
+  // Resposta enviada pelo operador (incl. pelo celular) significa que as
+  // mensagens recebidas anteriores já foram vistas: marca como lidas para o
+  // badge de não-lidas refletir a realidade.
+  if (direction === "out") {
+    await prisma.message.updateMany({
+      where: { conversationId: conversation.id, direction: "in", readAt: null },
+      data: { readAt: new Date() },
+    });
+  }
 
   if (isNewConversation) {
     emitEvent("conversation:new", { conversationId: conversation.id, contactId });
