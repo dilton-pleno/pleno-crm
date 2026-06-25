@@ -115,8 +115,26 @@ export async function getOrderById(creds: WbuyCreds, id: string): Promise<WbuyOr
   return Array.isArray(data) ? data[0] ?? null : data;
 }
 
+interface RawWebhook {
+  id?: string | number;
+  url?: string;
+  // A Wbuy pode devolver `type` como string ou como objeto { id, name }.
+  type?: string | { id?: string | number; name?: string } | null;
+}
+
+function normalizeType(t: RawWebhook["type"]): string {
+  if (typeof t === "string") return t;
+  if (t && typeof t === "object") return String(t.name ?? t.id ?? "");
+  return "";
+}
+
 export async function listWebhooks(creds: WbuyCreds): Promise<WbuyWebhook[]> {
-  return request<WbuyWebhook[]>(creds, "/webhook");
+  const raw = await request<RawWebhook[]>(creds, "/webhook");
+  return (Array.isArray(raw) ? raw : []).map((w) => ({
+    id: String(w.id ?? ""),
+    url: typeof w.url === "string" ? w.url : "",
+    type: normalizeType(w.type),
+  }));
 }
 
 export async function registerWebhook(
