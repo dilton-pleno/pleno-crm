@@ -51,10 +51,12 @@ export interface UserSession {
 }
 
 export type Module =
+  | "visao_geral"
   | "atendimento"
   | "contatos"
   | "kanban"
   | "campanhas"
+  | "ecommerce"
   | "alertas"
   | "automacoes"
   | "integracoes"

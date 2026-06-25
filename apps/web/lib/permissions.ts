@@ -3,10 +3,12 @@ import type { Role, Module } from "@pleno-crm/types";
 type AccessLevel = "full" | "read" | "request" | "none";
 
 const PERMISSION_MATRIX: Record<Module, Record<Role, AccessLevel>> = {
+  visao_geral:    { ADMIN: "full", GESTOR: "full",    ATENDENTE: "read"    },
   atendimento:    { ADMIN: "full", GESTOR: "full",    ATENDENTE: "full"    },
   contatos:       { ADMIN: "full", GESTOR: "full",    ATENDENTE: "read"    },
   kanban:         { ADMIN: "full", GESTOR: "full",    ATENDENTE: "full"    },
   campanhas:      { ADMIN: "full", GESTOR: "read",    ATENDENTE: "none"    },
+  ecommerce:      { ADMIN: "full", GESTOR: "full",    ATENDENTE: "none"    },
   alertas:        { ADMIN: "full", GESTOR: "request", ATENDENTE: "none"    },
   automacoes:     { ADMIN: "full", GESTOR: "request", ATENDENTE: "none"    },
   integracoes:    { ADMIN: "full", GESTOR: "full",    ATENDENTE: "request" },
