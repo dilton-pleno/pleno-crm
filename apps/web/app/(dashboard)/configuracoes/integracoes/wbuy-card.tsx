@@ -99,6 +99,22 @@ export function WbuyCard() {
     }
   }, []);
 
+  const syncOrders = useCallback(async () => {
+    setWorking(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/v1/integrations/wbuy/sync-orders", { method: "POST" });
+      const json = await res.json();
+      setMessage(
+        res.ok
+          ? { kind: "ok", text: `Pedidos sincronizados: ${json.data.synced}/${json.data.fetched}` }
+          : { kind: "err", text: json.error?.message ?? "Falha ao sincronizar" }
+      );
+    } finally {
+      setWorking(false);
+    }
+  }, []);
+
   const loadWebhooks = useCallback(async () => {
     const res = await fetch("/api/v1/integrations/wbuy/webhooks");
     if (res.ok) {
@@ -218,6 +234,13 @@ export function WbuyCard() {
                 className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
               >
                 Registrar webhooks
+              </button>
+              <button
+                onClick={() => void syncOrders()}
+                disabled={working}
+                className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
+              >
+                <ShoppingCart className="w-3.5 h-3.5" /> Sincronizar pedidos
               </button>
               <button
                 onClick={() => void loadWebhooks()}

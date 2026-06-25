@@ -84,28 +84,39 @@ export async function testConnection(creds: WbuyCreds): Promise<boolean> {
   return true;
 }
 
+// Shape do pedido conforme a resposta real da Wbuy (GET /order/{id}).
 export interface WbuyOrder {
   id: string;
-  status?: string;
-  valor?: string | number;
+  identificacao?: string;
+  data?: string; // "AAAA-MM-DD HH:MM:SS"
+  status?: { id?: string; nome?: string };
+  valor_total?: { subtotal?: string; desconto?: string; total?: string };
+  frete?: { rastreio?: string; nome?: string; valor?: string; prazo?: string };
   cliente?: {
     nome?: string;
     email?: string;
     telefone1?: string;
     telefone2?: string;
   };
-  produtos?: Array<{ nome?: string; quantidade?: number; valor?: string | number }>;
-  data?: string;
+  produtos?: Array<{
+    produto?: string;
+    qtd?: string;
+    valor?: string;
+    sku?: string;
+    cod?: string;
+  }>;
 }
 
 export async function getOrders(
   creds: WbuyCreds,
-  params: { data_inicial?: string; data_final?: string; status?: string; limit?: string } = {}
+  params: { periodo_inicial?: string; periodo_final?: string; status?: string; statusDesde?: string; limit?: string } = {}
 ): Promise<WbuyOrder[]> {
   const qs = new URLSearchParams();
-  if (params.data_inicial) qs.set("data_inicial", params.data_inicial);
-  if (params.data_final) qs.set("data_final", params.data_final);
+  if (params.periodo_inicial) qs.set("periodo_inicial", params.periodo_inicial);
+  if (params.periodo_final) qs.set("periodo_final", params.periodo_final);
   if (params.status) qs.set("status", params.status);
+  if (params.statusDesde) qs.set("statusDesde", params.statusDesde);
+  qs.set("order", "data,desc");
   qs.set("limit", params.limit ?? "0,100");
   return request<WbuyOrder[]>(creds, `/order/?${qs.toString()}`);
 }

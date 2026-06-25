@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { getAccessLevel } from "@/lib/permissions";
 import { MessageCircle, Hash, ArrowLeft } from "lucide-react";
 import { ContactEditCard } from "./contact-edit";
+import { OrderHistory } from "@/components/inbox/order-history";
 
 const CHANNEL_LABELS: Record<string, string> = {
   whatsapp: "WhatsApp",
@@ -46,7 +47,6 @@ export default async function ContatoPage({ params }: Props) {
           channel: { select: { channelType: true } },
         },
       },
-      orders: { orderBy: { createdAt: "desc" }, take: 5 },
     },
   });
 
@@ -150,32 +150,12 @@ export default async function ContatoPage({ params }: Props) {
             </div>
           </div>
 
-          {/* Histórico de pedidos */}
+          {/* Histórico de pedidos (Wbuy) */}
           <div className="bg-card border border-border rounded-lg p-4">
             <h2 className="text-sm font-semibold text-foreground mb-3">
               Histórico de pedidos
             </h2>
-            {contact.orders.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Integração com e-commerce em breve
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {contact.orders.map((order) => (
-                  <div key={order.id} className="text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-foreground font-medium">
-                        #{order.externalId}
-                      </span>
-                      <span className="text-foreground">
-                        R$ {Number(order.total).toFixed(2)}
-                      </span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{order.status}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <OrderHistory contactId={contact.id} />
           </div>
         </div>
       </div>

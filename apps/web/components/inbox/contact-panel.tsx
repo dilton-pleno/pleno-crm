@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Phone, Mail, Hash, CheckCircle, Clock, ExternalLink, Link2 } from "lucide-react";
+import { OrderHistory } from "./order-history";
 
 interface Channel {
   id: string;
@@ -259,11 +260,12 @@ export function ContactPanel({
         </div>
       )}
 
-      {/* Placeholder Wbuy */}
-      <div className="p-4 mt-auto border-t border-border">
-        <p className="text-xs text-muted-foreground italic">
-          Histórico de pedidos disponível após integração Wbuy (Módulo 5)
+      {/* Histórico de pedidos (Wbuy) */}
+      <div className="p-4 border-t border-border">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+          Histórico de pedidos
         </p>
+        <OrderHistory contactId={contact.id} compact />
       </div>
     </div>
   );
