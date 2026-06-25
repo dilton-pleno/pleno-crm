@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import type { WbuyOrder } from "@/lib/wbuy";
+import type { WbuyOrder, WbuyAbandonedCart } from "@/lib/wbuy";
 
 interface OrderItem {
   name: string;
@@ -97,5 +97,36 @@ export async function updateWbuyOrderStatus(
   await prisma.order.updateMany({
     where: { externalId: String(pedidoId) },
     data: { status: statusNome, syncedAt: new Date() },
+  });
+}
+
+/**
+ * Upsert de carrinho abandonado (webhook abandoned_cart). Chave: id_envio.
+ */
+export async function upsertAbandonedCart(cart: WbuyAbandonedCart): Promise<void> {
+  if (!cart.id_envio) return;
+
+  const produtos = cart.produtos ?? [];
+  let total = 0;
+  let itemsCount = 0;
+  for (const p of produtos) {
+    const qty = Number(p.quantidade ?? 1);
+    total += Number(p.valor ?? 0) * qty;
+    itemsCount += qty;
+  }
+
+  const data = {
+    customerName: cart.cliente?.nome ?? null,
+    customerEmail: cart.cliente?.email ?? null,
+    customerPhone: cart.cliente?.telefone ? digits(cart.cliente.telefone) : null,
+    total: new Prisma.Decimal(total),
+    itemsCount,
+    products: produtos as unknown as Prisma.InputJsonValue,
+  };
+
+  await prisma.abandonedCart.upsert({
+    where: { externalId: String(cart.id_envio) },
+    update: data,
+    create: { ...data, externalId: String(cart.id_envio) },
   });
 }

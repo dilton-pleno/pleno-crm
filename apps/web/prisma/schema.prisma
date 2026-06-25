@@ -70,6 +70,23 @@ model IntegrationConfig {
   @@map("integration_configs")
 }
 
+// Carrinhos abandonados recebidos via webhook da Wbuy (não há GET na API, logo
+// só há dados a partir do recebimento — sem backfill). Base para relatório.
+model AbandonedCart {
+  id            String   @id @default(uuid())
+  externalId    String   @unique @map("external_id") // id_envio
+  customerName  String?  @map("customer_name")
+  customerEmail String?  @map("customer_email")
+  customerPhone String?  @map("customer_phone")
+  total         Decimal  @default(0) @db.Decimal(12, 2)
+  itemsCount    Int      @default(0) @map("items_count")
+  products      Json?
+  recovered     Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("abandoned_carts")
+}
+
 // ============================================================
 // CONTATOS E CANAIS
 // ============================================================
