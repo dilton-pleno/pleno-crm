@@ -43,7 +43,10 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string } } | n
     }
   }
 
-  return NextResponse.next();
+  // Expõe o caminho atual para o layout (server) destacar o item ativo na sidebar.
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-pathname", pathname);
+  return NextResponse.next({ request: { headers: requestHeaders } });
 });
 
 export const config = {
