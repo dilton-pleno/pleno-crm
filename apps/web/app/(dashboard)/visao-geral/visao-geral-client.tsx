@@ -22,7 +22,7 @@ interface OverviewData {
     new_last_7_days: number;
   };
   campanhas: { spend: number; clicks: number; reach: number; roas: number } | null;
-  ecommerce: { integrated: boolean; orders: number; revenue: number };
+  ecommerce: { integrated: boolean; orders: number; revenue: number } | null;
 }
 
 function fmtCurrency(n: number): string {
@@ -101,20 +101,22 @@ export function VisaoGeralClient({ userName }: { userName: string }) {
             </Section>
           )}
 
-          {/* Ecommerce */}
-          <Section title="Ecommerce" icon={ShoppingCart} href="/ecommerce" linkLabel="Abrir ecommerce">
-            {data?.ecommerce.integrated ? (
-              <div className="grid grid-cols-2 gap-3">
-                <Stat label="Pedidos" value={fmtNumber(data.ecommerce.orders)} />
-                <Stat label="Receita" value={fmtCurrency(data.ecommerce.revenue)} />
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Integração com a Wbuy em desenvolvimento (Módulo 5). Pedidos e receita
-                aparecerão aqui em breve.
-              </p>
-            )}
-          </Section>
+          {/* Ecommerce (apenas Admin/Gestor) */}
+          {data?.ecommerce && (
+            <Section title="Ecommerce" icon={ShoppingCart} href="/ecommerce" linkLabel="Abrir ecommerce">
+              {data.ecommerce.integrated ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <Stat label="Pedidos" value={fmtNumber(data.ecommerce.orders)} />
+                  <Stat label="Receita" value={fmtCurrency(data.ecommerce.revenue)} />
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Integração com a Wbuy em desenvolvimento (Módulo 5). Pedidos e receita
+                  aparecerão aqui em breve.
+                </p>
+              )}
+            </Section>
+          )}
         </>
       )}
     </div>

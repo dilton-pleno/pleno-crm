@@ -62,15 +62,19 @@ export async function GET(): Promise<NextResponse> {
   }
 
   // ---- Ecommerce (Wbuy — Módulo 5, ainda não integrado) ----
-  const ordersAgg = await prisma.order.aggregate({
-    _count: { id: true },
-    _sum: { total: true },
-  });
-  const ecommerce = {
-    integrated: false,
-    orders: ordersAgg._count.id,
-    revenue: ordersAgg._sum.total ? dec(ordersAgg._sum.total) : 0,
-  };
+  // Apenas Admin/Gestor; o Atendente vê só o atendimento.
+  let ecommerce: { integrated: boolean; orders: number; revenue: number } | null = null;
+  if (getAccessLevel(role, "ecommerce") !== "none") {
+    const ordersAgg = await prisma.order.aggregate({
+      _count: { id: true },
+      _sum: { total: true },
+    });
+    ecommerce = {
+      integrated: false,
+      orders: ordersAgg._count.id,
+      revenue: ordersAgg._sum.total ? dec(ordersAgg._sum.total) : 0,
+    };
+  }
 
   return NextResponse.json({
     data: { atendimento, campanhas, ecommerce },

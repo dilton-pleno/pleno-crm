@@ -29,7 +29,7 @@ function LoginForm() {
       return;
     }
 
-    const callbackUrl = params.get("callbackUrl") ?? "/atendimento";
+    const callbackUrl = params.get("callbackUrl") ?? "/visao-geral";
     router.push(callbackUrl);
   }
 

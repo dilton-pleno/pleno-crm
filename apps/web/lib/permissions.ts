@@ -35,7 +35,7 @@ export function getDefaultRoute(role: string): string {
     case "ADMIN":
     case "GESTOR":
     case "ATENDENTE":
-      return "/atendimento";
+      return "/visao-geral";
     default:
       return "/login";
   }
