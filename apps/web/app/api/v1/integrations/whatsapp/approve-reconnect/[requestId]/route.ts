@@ -51,7 +51,19 @@ export async function POST(
 
   let qrcode: string;
   try {
-    qrcode = await connectInstance(instanceName);
+    const result = await connectInstance(instanceName);
+    if (result.kind === "connected") {
+      return NextResponse.json(
+        {
+          error: {
+            code: "ALREADY_CONNECTED",
+            message: "A instância já está conectada. Não é necessário reconectar.",
+          },
+        },
+        { status: 409 }
+      );
+    }
+    qrcode = result.qrcode;
   } catch (err) {
     console.error("[integrations] Erro ao gerar QR Code:", err);
     return NextResponse.json(

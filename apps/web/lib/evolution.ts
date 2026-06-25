@@ -114,11 +114,18 @@ interface RawConnectResponse {
   qrcode?: { base64?: string };
 }
 
+export type ConnectResult =
+  | { kind: "qr"; qrcode: string }
+  | { kind: "connected" };
+
 /**
- * Solicita a conexão da instância via GET /instance/connect/{instance},
- * retornando o QR Code em base64 (string `data:image/...;base64,...`).
+ * Solicita a conexão da instância via GET /instance/connect/{instance}.
+ *
+ * Quando a instância está desconectada, o Evolution retorna o QR Code em
+ * base64. Quando já está conectada, não há QR e o retorno indica o estado
+ * "open" — nesse caso devolvemos `kind: "connected"` em vez de lançar erro.
  */
-export async function connectInstance(instanceName: string): Promise<string> {
+export async function connectInstance(instanceName: string): Promise<ConnectResult> {
   const res = await fetch(`${baseUrl()}/instance/connect/${instanceName}`, {
     method: "GET",
     headers: headers(),
@@ -132,11 +139,28 @@ export async function connectInstance(instanceName: string): Promise<string> {
   const data = (await res.json()) as RawConnectResponse;
   const base64 = data.base64 ?? data.qrcode?.base64;
 
-  if (!base64) {
-    throw new Error("Evolution connect não retornou QR Code");
+  if (base64) {
+    return { kind: "qr", qrcode: base64 };
   }
 
-  return base64;
+  return { kind: "connected" };
+}
+
+/**
+ * Desconecta a instância via DELETE /instance/logout/{instance}, encerrando a
+ * sessão atual do WhatsApp. Necessário antes de gerar um novo QR Code quando a
+ * instância já está conectada. Um 404 é tolerado (instância já desconectada).
+ */
+export async function logoutInstance(instanceName: string): Promise<void> {
+  const res = await fetch(`${baseUrl()}/instance/logout/${instanceName}`, {
+    method: "DELETE",
+    headers: headers(),
+  });
+
+  if (!res.ok && res.status !== 404) {
+    const body = await res.text();
+    throw new Error(`Evolution logout falhou [${res.status}]: ${body}`);
+  }
 }
 
 export async function sendMedia(
