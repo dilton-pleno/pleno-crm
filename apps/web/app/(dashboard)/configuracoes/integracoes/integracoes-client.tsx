@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, X, QrCode, MessageCircle, CheckCircle2, AlertCircle } from "lucide-react";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { WbuyCard } from "./wbuy-card";
 
 interface WhatsAppStatus {
   status: "connected" | "disconnected";
@@ -13,9 +14,10 @@ interface WhatsAppStatus {
 interface Props {
   currentUserId: string;
   canManage: boolean;
+  isAdmin: boolean;
 }
 
-export function IntegracoesClient({ currentUserId, canManage }: Props) {
+export function IntegracoesClient({ currentUserId, canManage, isAdmin }: Props) {
   const [status, setStatus] = useState<WhatsAppStatus | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [qrcode, setQrcode] = useState<string | null>(null);
@@ -220,6 +222,9 @@ export function IntegracoesClient({ currentUserId, canManage }: Props) {
           )}
         </div>
       </div>
+
+      {/* Card Wbuy (e-commerce) — gestão de credenciais só para Admin */}
+      {isAdmin && <WbuyCard />}
 
       {showModal && (
         <QrCodeModal qrcode={qrcode} onClose={closeModal} />

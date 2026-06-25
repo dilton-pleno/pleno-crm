@@ -55,6 +55,21 @@ model IntegrationRequest {
   @@map("integration_requests")
 }
 
+// Configuração de integrações externas gerenciadas pelo painel (ex.: Wbuy).
+// O segredo da API é guardado cifrado (AES-256-GCM) em apiSecret.
+model IntegrationConfig {
+  id         String   @id @default(uuid())
+  provider   String   @unique // "wbuy"
+  apiUser    String?  @map("api_user")
+  apiSecret  String?  @map("api_secret") // cifrado
+  active     Boolean  @default(false)
+  config     Json? // metadados (ex.: webhooks registrados)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("integration_configs")
+}
+
 // ============================================================
 // CONTATOS E CANAIS
 // ============================================================
