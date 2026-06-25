@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
-import { connectInstance } from "@/lib/evolution";
+import { connectInstance, logoutInstance } from "@/lib/evolution";
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   // Admin e Gestor podem gerar o QR Code diretamente, sem solicitação.
   const guard = await requireAccess("integracoes", "full");
   if (!guard.ok) return guard.response;
@@ -20,9 +20,31 @@ export async function GET(): Promise<NextResponse> {
     );
   }
 
+  // force=true desconecta a sessão atual antes de gerar um novo QR Code,
+  // necessário para reparear quando a instância já está conectada.
+  const force = request.nextUrl.searchParams.get("force") === "true";
+
   try {
-    const qrcode = await connectInstance(instanceName);
-    return NextResponse.json({ data: { qrcode } });
+    if (force) {
+      await logoutInstance(instanceName);
+    }
+
+    const result = await connectInstance(instanceName);
+
+    if (result.kind === "connected") {
+      return NextResponse.json(
+        {
+          error: {
+            code: "ALREADY_CONNECTED",
+            message:
+              "A instância já está conectada. Desconecte antes de gerar um novo QR Code.",
+          },
+        },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json({ data: { qrcode: result.qrcode } });
   } catch (err) {
     console.error("[integrations] Erro ao gerar QR Code:", err);
     return NextResponse.json(

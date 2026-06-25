@@ -22,7 +22,10 @@ export function IntegracoesClient({ currentUserId, canManage }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [working, setWorking] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
+  const [confirmingForce, setConfirmingForce] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const connected = status?.status === "connected";
 
   const fetchStatus = useCallback(async () => {
     setLoadingStatus(true);
@@ -57,15 +60,19 @@ export function IntegracoesClient({ currentUserId, canManage }: Props) {
     },
   });
 
-  const handleReconnect = useCallback(async () => {
+  const handleReconnect = useCallback(async (force: boolean) => {
     setWorking(true);
     setError(null);
     try {
-      const res = await fetch("/api/v1/integrations/whatsapp/qrcode");
+      const url = force
+        ? "/api/v1/integrations/whatsapp/qrcode?force=true"
+        : "/api/v1/integrations/whatsapp/qrcode";
+      const res = await fetch(url);
       const json = await res.json();
       if (res.ok) {
         setQrcode(json.data.qrcode as string);
         setShowModal(true);
+        setConfirmingForce(false);
       } else {
         setError(json.error?.message ?? "Falha ao gerar QR Code");
       }
@@ -73,6 +80,17 @@ export function IntegracoesClient({ currentUserId, canManage }: Props) {
       setWorking(false);
     }
   }, []);
+
+  // Conectado: reconectar derruba a sessão atual, então pede confirmação.
+  // Desconectado: gera o QR Code direto.
+  const onReconnectClick = useCallback(() => {
+    setError(null);
+    if (connected) {
+      setConfirmingForce(true);
+    } else {
+      void handleReconnect(false);
+    }
+  }, [connected, handleReconnect]);
 
   const handleRequestReconnect = useCallback(async () => {
     setWorking(true);
@@ -97,8 +115,6 @@ export function IntegracoesClient({ currentUserId, canManage }: Props) {
     setQrcode(null);
     void fetchStatus();
   }, [fetchStatus]);
-
-  const connected = status?.status === "connected";
 
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-4 max-w-2xl mx-auto w-full">
@@ -156,11 +172,37 @@ export function IntegracoesClient({ currentUserId, canManage }: Props) {
           </div>
         )}
 
+        {confirmingForce && (
+          <div className="text-xs bg-yellow-500/10 border border-yellow-500/40 rounded-md px-3 py-2.5 flex flex-col gap-2">
+            <p className="text-foreground">
+              A instância está conectada{status?.number ? ` (${status.number})` : ""}.
+              Reconectar vai <span className="font-medium">desconectar a sessão atual</span> e
+              gerar um novo QR Code. Deseja continuar?
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => void handleReconnect(true)}
+                disabled={working}
+                className="text-xs bg-primary text-primary-foreground rounded-md px-3 py-1.5 hover:opacity-90 disabled:opacity-50"
+              >
+                {working ? "Gerando..." : "Desconectar e gerar QR"}
+              </button>
+              <button
+                onClick={() => setConfirmingForce(false)}
+                disabled={working}
+                className="text-xs text-muted-foreground hover:bg-accent rounded-md px-3 py-1.5 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-2">
           {canManage ? (
             <button
-              onClick={() => void handleReconnect()}
-              disabled={working}
+              onClick={onReconnectClick}
+              disabled={working || confirmingForce}
               className="flex items-center gap-1.5 text-xs bg-primary text-primary-foreground rounded-md px-3 py-2 hover:opacity-90 disabled:opacity-50"
             >
               <QrCode className="w-3.5 h-3.5" />
