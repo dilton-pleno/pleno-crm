@@ -10,18 +10,18 @@ export interface WbuyCreds {
 
 export interface WbuyWebhook {
   id: string;
+  type: string;
   url: string;
-  evento: string;
 }
 
-// Eventos de pedido/pagamento que fazem sentido para o CRM (os webhooks da
-// Wbuy são focados no ciclo do pedido). Ajustar conforme o painel real.
-export const WBUY_ORDER_EVENTS = [
-  "pedido_aprovado",
-  "pedido_autorizado",
-  "pedido_pago",
-  "pedido_estornado",
-  "pagamento_nao_autorizado",
+// Tipos de webhook da Wbuy (campo "type" no POST). A API aceita: customer,
+// order, order_status, product, stock, stock_price, abandoned_cart.
+// Registramos os relevantes para o CRM (pedidos, clientes e carrinho abandonado).
+export const WBUY_WEBHOOK_TYPES = [
+  "order",
+  "order_status",
+  "customer",
+  "abandoned_cart",
 ] as const;
 
 function baseUrl(): string {
@@ -116,17 +116,17 @@ export async function getOrderById(creds: WbuyCreds, id: string): Promise<WbuyOr
 }
 
 export async function listWebhooks(creds: WbuyCreds): Promise<WbuyWebhook[]> {
-  return request<WbuyWebhook[]>(creds, "/webhook/");
+  return request<WbuyWebhook[]>(creds, "/webhook");
 }
 
 export async function registerWebhook(
   creds: WbuyCreds,
   url: string,
-  evento: string
+  type: string
 ): Promise<void> {
-  await request(creds, "/webhook", {
+  await request(creds, "/webhook/", {
     method: "POST",
-    body: JSON.stringify({ url, evento }),
+    body: JSON.stringify({ type, url }),
   });
 }
 

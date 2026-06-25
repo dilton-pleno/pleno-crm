@@ -12,7 +12,7 @@ interface WbuyStatus {
 interface Webhook {
   id: string;
   url: string;
-  evento: string;
+  type: string;
 }
 
 export function WbuyCard() {
@@ -238,7 +238,7 @@ export function WbuyCard() {
           ) : (
             webhooks.map((w) => (
               <div key={w.id} className="flex items-center gap-2 text-xs">
-                <span className="text-foreground">{w.evento}</span>
+                <span className="text-foreground font-medium w-28 truncate">{w.type}</span>
                 <span className="text-muted-foreground truncate flex-1">{w.url}</span>
                 <button
                   onClick={() => void removeWebhook(w.id)}
