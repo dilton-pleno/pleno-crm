@@ -10,6 +10,7 @@ type EventName =
   | "card:moved"
   | "integration:reconnect_requested"
   | "integration:qr_code"
+  | "alert:triggered"
   | "connected";
 
 type EventHandler = (payload: Record<string, unknown>) => void;

@@ -8,7 +8,8 @@ type EventName =
   | "conversation:status_changed"
   | "card:moved"
   | "integration:reconnect_requested"
-  | "integration:qr_code";
+  | "integration:qr_code"
+  | "alert:triggered";
 
 interface WsEvent {
   event: EventName;
