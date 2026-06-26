@@ -26,10 +26,11 @@ async function main() {
 
   const pipeline = await prisma.pipeline.upsert({
     where: { id: "default-pipeline" },
-    update: {},
+    update: { isDefault: true },
     create: {
       id: "default-pipeline",
       name: "Atendimento",
+      isDefault: true,
       createdBy: admin.id,
       stages: {
         createMany: {

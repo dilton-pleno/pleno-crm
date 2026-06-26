@@ -55,11 +55,23 @@ export async function GET(
                   messages: {
                     orderBy: { sentAt: "desc" },
                     take: 1,
-                    select: { content: true, sentAt: true },
+                    select: { content: true, sentAt: true, direction: true },
                   },
                 },
               },
-              contact: { select: { id: true, name: true, avatarUrl: true } },
+              contact: {
+                select: {
+                  id: true,
+                  name: true,
+                  avatarUrl: true,
+                  phone: true,
+                  orders: {
+                    orderBy: { createdAt: "desc" },
+                    take: 1,
+                    select: { status: true, total: true },
+                  },
+                },
+              },
             },
           },
         },
@@ -76,10 +88,23 @@ export async function GET(
 
   const now = Date.now();
 
+  // Não lidas por conversa (mensagens recebidas ainda não lidas).
+  const conversationIds = pipeline.stages.flatMap((s) => s.cards.map((c) => c.conversationId));
+  const unreadGroups =
+    conversationIds.length > 0
+      ? await prisma.message.groupBy({
+          by: ["conversationId"],
+          where: { conversationId: { in: conversationIds }, direction: "in", readAt: null },
+          _count: { id: true },
+        })
+      : [];
+  const unreadMap = Object.fromEntries(unreadGroups.map((u) => [u.conversationId, u._count.id]));
+
   const stages = pipeline.stages.map((stage) => {
     const cards = stage.cards.map((card) => {
       const lastMsg = card.conversation.messages[0];
       const lastActivity = lastMsg?.sentAt ?? card.updatedAt;
+      const lastOrder = card.contact.orders[0];
       return {
         id: card.id,
         conversation_id: card.conversationId,
@@ -87,10 +112,17 @@ export async function GET(
           id: card.contact.id,
           name: card.contact.name,
           avatar_url: card.contact.avatarUrl,
+          phone: card.contact.phone,
         },
         channel_type: card.conversation.channel.channelType,
         last_message_preview: lastMsg?.content ?? null,
+        last_direction: lastMsg?.direction ?? null,
         last_activity_at: lastActivity.toISOString(),
+        unread_count: unreadMap[card.conversationId] ?? 0,
+        time_in_stage_seconds: Math.round((now - card.updatedAt.getTime()) / 1000),
+        last_order: lastOrder
+          ? { status: lastOrder.status, total: Number(lastOrder.total) }
+          : null,
         assigned_to: card.conversation.agent
           ? {
               id: card.conversation.agent.id,
