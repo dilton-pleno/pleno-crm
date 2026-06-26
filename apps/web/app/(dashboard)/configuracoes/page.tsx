@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { SlidersHorizontal, Zap, Users, Plug, ChevronRight } from "lucide-react";
+import { SlidersHorizontal, Zap, Users, Plug, ChevronRight, Tag, MessageSquareText } from "lucide-react";
 
 export default async function ConfiguracoesPage() {
   const session = await auth();
@@ -25,7 +25,19 @@ export default async function ConfiguracoesPage() {
       href: "/configuracoes/pipeline",
       icon: SlidersHorizontal,
       title: "Pipeline do Kanban",
-      description: "Criar, renomear, reordenar e remover estágios",
+      description: "Criar pipelines e gerenciar estágios",
+    },
+    {
+      href: "/configuracoes/etiquetas",
+      icon: Tag,
+      title: "Etiquetas",
+      description: "Criar e organizar etiquetas de leads e suas cores",
+    },
+    {
+      href: "/configuracoes/respostas-rapidas",
+      icon: MessageSquareText,
+      title: "Respostas rápidas",
+      description: "Mensagens prontas para o atendimento",
     },
     {
       href: "/configuracoes/automacoes",
