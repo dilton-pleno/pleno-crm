@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Search, Users } from "lucide-react";
+import { ChannelBadge } from "@/components/ui/channel-badge";
 
 interface ContactItem {
   id: string;
@@ -15,14 +16,6 @@ interface ContactItem {
   channels: Array<{ id: string; channel_type: string }>;
   last_interaction_at: string | null;
 }
-
-const CHANNEL_ICONS: Record<string, string> = {
-  whatsapp: "WA",
-  instagram: "IG",
-  messenger: "ME",
-  email: "EM",
-  site: "SI",
-};
 
 const PER_PAGE = 30;
 
@@ -144,13 +137,7 @@ export function ContatosClient() {
                 </span>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {c.channels.map((ch) => (
-                    <span
-                      key={ch.id}
-                      className="text-[9px] bg-accent text-foreground rounded px-1 py-0.5 leading-none"
-                      title={ch.channel_type}
-                    >
-                      {CHANNEL_ICONS[ch.channel_type] ?? "??"}
-                    </span>
+                    <ChannelBadge key={ch.id} type={ch.channel_type} size={16} />
                   ))}
                 </div>
               </div>

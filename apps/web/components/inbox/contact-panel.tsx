@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Phone, Mail, Hash, CheckCircle, Clock, ExternalLink, Link2 } from "lucide-react";
+import { Phone, Mail, CheckCircle, Clock, ExternalLink, Link2 } from "lucide-react";
 import { OrderHistory } from "./order-history";
+import { ChannelIcon } from "@/components/ui/channel-badge";
+import type { Role } from "@pleno-crm/types";
 
 interface Channel {
   id: string;
@@ -41,15 +43,23 @@ interface LinkSuggestion {
   channels: Array<{ channel_type: string; channel_identifier: string }>;
 }
 
+interface Agent {
+  id: string;
+  name: string;
+}
+
 interface Props {
   contact: Contact | null;
   conversation: ConversationMeta | null;
   onResolve: () => void;
   onPending: () => void;
   onAssignMe: () => void;
+  onAssign?: (userId: string | null) => void;
   onLinked?: () => void;
   canLink?: boolean;
   currentUserId: string;
+  currentUserRole: Role;
+  agents?: Agent[];
 }
 
 export function ContactPanel({
@@ -58,9 +68,12 @@ export function ContactPanel({
   onResolve,
   onPending,
   onAssignMe,
+  onAssign,
   onLinked,
   canLink = false,
   currentUserId,
+  currentUserRole,
+  agents = [],
 }: Props) {
   const [suggestions, setSuggestions] = useState<LinkSuggestion[]>([]);
   const [linking, setLinking] = useState<string | null>(null);
@@ -122,6 +135,7 @@ export function ContactPanel({
   }
 
   const isAssignedToMe = conversation.assignedTo?.id === currentUserId;
+  const canAssignOthers = currentUserRole === "ADMIN" || currentUserRole === "GESTOR";
 
   return (
     <div
@@ -170,6 +184,23 @@ export function ContactPanel({
             {conversation.assignedTo?.name ?? "Não atribuída"}
           </span>
         </div>
+
+        {/* ADMIN/GESTOR atribuem a qualquer agente */}
+        {canAssignOthers && onAssign && (
+          <select
+            value={conversation.assignedTo?.id ?? ""}
+            onChange={(e) => onAssign(e.target.value || null)}
+            className="w-full text-xs bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            <option value="">Não atribuída</option>
+            {agents.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+                {a.id === currentUserId ? " (eu)" : ""}
+              </option>
+            ))}
+          </select>
+        )}
 
         {!isAssignedToMe && (
           <button
@@ -240,7 +271,7 @@ export function ContactPanel({
         <div className="flex flex-col gap-1.5">
           {contact.channels.map((ch) => (
             <div key={ch.id} className="flex items-center gap-2 text-xs">
-              <Hash className="w-3 h-3 text-muted-foreground" />
+              <ChannelIcon type={ch.channelType} size={14} />
               <span className="text-muted-foreground">
                 {CHANNEL_LABELS[ch.channelType] ?? ch.channelType}
               </span>

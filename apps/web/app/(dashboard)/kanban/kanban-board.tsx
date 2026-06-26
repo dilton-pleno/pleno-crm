@@ -16,6 +16,8 @@ import { X } from "lucide-react";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { MessageTimeline } from "@/components/inbox/message-timeline";
 import { MessageInput } from "@/components/inbox/message-input";
+import { ChannelBadge } from "@/components/ui/channel-badge";
+import type { Role } from "@pleno-crm/types";
 
 interface BoardCard {
   id: string;
@@ -54,14 +56,6 @@ interface MessageItem {
   sender: { id: string; name: string; type: "contact" | "agent" };
 }
 
-const CHANNEL_ICONS: Record<string, string> = {
-  whatsapp: "WA",
-  instagram: "IG",
-  messenger: "ME",
-  email: "EM",
-  site: "SI",
-};
-
 function formatRelative(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diffMs / 60000);
@@ -91,9 +85,11 @@ interface Agent {
 interface Props {
   pipelineId: string;
   agents: Agent[];
+  currentUserId: string;
+  currentUserRole: Role;
 }
 
-export function KanbanBoard({ pipelineId, agents }: Props) {
+export function KanbanBoard({ pipelineId, agents, currentUserId, currentUserRole }: Props) {
   const [board, setBoard] = useState<BoardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeCard, setActiveCard] = useState<BoardCard | null>(null);
@@ -155,6 +151,23 @@ export function KanbanBoard({ pipelineId, agents }: Props) {
       void fetchMessages(card.conversation_id);
     },
     [fetchMessages]
+  );
+
+  const assignCard = useCallback(
+    async (conversationId: string, userId: string | null) => {
+      const res = await fetch(`/api/v1/conversations/${conversationId}/assign`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      if (res.ok) {
+        const agent = userId ? agents.find((a) => a.id === userId) ?? null : null;
+        const assigned = agent ? { id: agent.id, name: agent.name, avatar_url: null } : null;
+        setSelected((prev) => (prev ? { ...prev, assigned_to: assigned } : prev));
+        void fetchBoard();
+      }
+    },
+    [agents, fetchBoard]
   );
 
   const moveCardLocal = useCallback((cardId: string, toStageId: string) => {
@@ -295,6 +308,10 @@ export function KanbanBoard({ pipelineId, agents }: Props) {
         <ConversationDrawer
           card={selected}
           messages={messages}
+          agents={agents}
+          canAssignOthers={currentUserRole === "ADMIN" || currentUserRole === "GESTOR"}
+          currentUserId={currentUserId}
+          onAssign={(userId) => void assignCard(selected.conversation_id, userId)}
           onClose={() => setSelected(null)}
           onMessageSent={() => void fetchMessages(selected.conversation_id)}
         />
@@ -391,9 +408,7 @@ function CardContent({ card, dragging }: { card: BoardCard; dragging?: boolean }
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-semibold">
             {card.contact.name.charAt(0).toUpperCase()}
           </div>
-          <span className="absolute -bottom-0.5 -right-0.5 text-[8px] bg-green-500 text-white rounded px-0.5 leading-none py-0.5">
-            {CHANNEL_ICONS[card.channel_type] ?? "??"}
-          </span>
+          <ChannelBadge type={card.channel_type} size={14} className="absolute -bottom-0.5 -right-0.5" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-foreground truncate">{card.contact.name}</p>
@@ -420,11 +435,19 @@ function CardContent({ card, dragging }: { card: BoardCard; dragging?: boolean }
 function ConversationDrawer({
   card,
   messages,
+  agents,
+  canAssignOthers,
+  currentUserId,
+  onAssign,
   onClose,
   onMessageSent,
 }: {
   card: BoardCard;
   messages: MessageItem[];
+  agents: Agent[];
+  canAssignOthers: boolean;
+  currentUserId: string;
+  onAssign: (userId: string | null) => void;
   onClose: () => void;
   onMessageSent: () => void;
 }) {
@@ -433,8 +456,11 @@ function ConversationDrawer({
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative w-full max-w-md bg-background border-l border-border flex flex-col h-full shadow-xl">
         <div className="px-4 py-3 border-b border-border bg-card flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
-            {card.contact.name.charAt(0).toUpperCase()}
+          <div className="relative flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
+              {card.contact.name.charAt(0).toUpperCase()}
+            </div>
+            <ChannelBadge type={card.channel_type} size={14} className="absolute -bottom-0.5 -right-0.5" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">{card.contact.name}</p>
@@ -447,6 +473,26 @@ function ConversationDrawer({
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Atribuição (ADMIN/GESTOR) */}
+        {canAssignOthers && (
+          <div className="px-4 py-2 border-b border-border bg-card flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Agente:</span>
+            <select
+              value={card.assigned_to?.id ?? ""}
+              onChange={(e) => onAssign(e.target.value || null)}
+              className="flex-1 text-xs bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="">Não atribuída</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                  {a.id === currentUserId ? " (eu)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <MessageTimeline messages={messages} />
         <MessageInput conversationId={card.conversation_id} onMessageSent={onMessageSent} />
