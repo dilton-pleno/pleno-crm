@@ -199,6 +199,25 @@ export async function getReviews(
   return request<WbuyReviewRaw[]>(creds, `/product/review/?${qs.toString()}`);
 }
 
+// Shape do inscrito de newsletter (GET /newsletter/). Chave = email.
+export interface WbuyNewsletterRaw {
+  email?: string;
+  nome?: string;
+  telefone?: string;
+  genero?: string;
+  data?: string;
+  ativo?: string;
+}
+
+export async function getNewsletter(
+  creds: WbuyCreds,
+  params: { limit?: string } = {}
+): Promise<WbuyNewsletterRaw[]> {
+  const qs = new URLSearchParams();
+  qs.set("limit", params.limit ?? "0,100");
+  return request<WbuyNewsletterRaw[]>(creds, `/newsletter/?${qs.toString()}`);
+}
+
 export async function listWebhooks(creds: WbuyCreds): Promise<WbuyWebhook[]> {
   const raw = await request<RawWebhook[]>(creds, "/webhook");
   return (Array.isArray(raw) ? raw : []).map((w) => ({
