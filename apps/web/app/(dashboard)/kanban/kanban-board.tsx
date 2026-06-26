@@ -17,12 +17,19 @@ import { useWebSocket } from "@/hooks/use-websocket";
 import { MessageTimeline } from "@/components/inbox/message-timeline";
 import { MessageInput } from "@/components/inbox/message-input";
 import { ChannelBadge } from "@/components/ui/channel-badge";
+import { TagChip, type TagData } from "@/components/ui/tag-chip";
 import type { Role } from "@pleno-crm/types";
 
 interface BoardCard {
   id: string;
   conversation_id: string;
-  contact: { id: string; name: string; avatar_url: string | null; phone: string | null };
+  contact: {
+    id: string;
+    name: string;
+    avatar_url: string | null;
+    phone: string | null;
+    tags: TagData[];
+  };
   channel_type: string;
   last_message_preview: string | null;
   last_direction: "in" | "out" | null;
@@ -131,7 +138,19 @@ export function KanbanBoard({
   // Filtros
   const [agentFilter, setAgentFilter] = useState("");
   const [channelFilter, setChannelFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
   const [fromFilter, setFromFilter] = useState("");
+  const [tags, setTags] = useState<TagData[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch("/api/v1/tags");
+      if (res.ok) {
+        const json = (await res.json()) as { data: TagData[] };
+        setTags(json.data);
+      }
+    })();
+  }, []);
 
   const refreshPipelines = useCallback(async () => {
     const res = await fetch("/api/v1/pipelines");
@@ -149,10 +168,11 @@ export function KanbanBoard({
     const p = new URLSearchParams();
     if (agentFilter) p.set("agent_id", agentFilter);
     if (channelFilter) p.set("channel", channelFilter);
+    if (tagFilter) p.set("tag", tagFilter);
     if (fromFilter) p.set("from", new Date(fromFilter).toISOString());
     const s = p.toString();
     return s ? `?${s}` : "";
-  }, [agentFilter, channelFilter, fromFilter]);
+  }, [agentFilter, channelFilter, tagFilter, fromFilter]);
 
   const fetchBoard = useCallback(async () => {
     try {
@@ -347,6 +367,20 @@ export function KanbanBoard({
           <option value="instagram">Instagram</option>
           <option value="messenger">Messenger</option>
         </select>
+        {tags.length > 0 && (
+          <select
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="text-xs bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            <option value="">Todas as etiquetas</option>
+            {tags.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        )}
         <label className="text-xs text-muted-foreground flex items-center gap-1">
           Criados a partir de
           <input
@@ -356,11 +390,12 @@ export function KanbanBoard({
             className="text-xs bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </label>
-        {(agentFilter || channelFilter || fromFilter) && (
+        {(agentFilter || channelFilter || tagFilter || fromFilter) && (
           <button
             onClick={() => {
               setAgentFilter("");
               setChannelFilter("");
+              setTagFilter("");
               setFromFilter("");
             }}
             className="text-xs text-primary hover:underline"
@@ -529,6 +564,15 @@ function CardContent({ card, dragging }: { card: BoardCard; dragging?: boolean }
           </p>
         </div>
       </div>
+
+      {/* Etiquetas */}
+      {card.contact.tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {card.contact.tags.map((t) => (
+            <TagChip key={t.id} tag={t} size="xs" />
+          ))}
+        </div>
+      )}
 
       {/* Último pedido (Wbuy) */}
       {card.last_order && (

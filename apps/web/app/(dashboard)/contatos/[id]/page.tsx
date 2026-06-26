@@ -7,6 +7,7 @@ import { MessageCircle, ArrowLeft } from "lucide-react";
 import { ChannelIcon } from "@/components/ui/channel-badge";
 import { ContactEditCard } from "./contact-edit";
 import { ContactWbuyData } from "./contact-wbuy-data";
+import { TagEditor } from "@/components/ui/tag-editor";
 import { OrderHistory } from "@/components/inbox/order-history";
 
 interface WbuyAddress {
@@ -57,6 +58,7 @@ export default async function ContatoPage({ params }: Props) {
     where: { id },
     include: {
       channels: true,
+      tags: { orderBy: { name: "asc" } },
       conversations: {
         orderBy: { updatedAt: "desc" },
         include: {
@@ -148,6 +150,16 @@ export default async function ContatoPage({ params }: Props) {
 
         {/* Coluna lateral: canais e pedidos */}
         <div className="flex flex-col gap-4">
+          {/* Etiquetas */}
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h2 className="text-sm font-semibold text-foreground mb-3">Etiquetas</h2>
+            <TagEditor
+              contactId={contact.id}
+              initialTags={contact.tags.map((t) => ({ id: t.id, name: t.name, color: t.color }))}
+              canEdit={canEdit}
+            />
+          </div>
+
           {/* Dados enriquecidos da Wbuy */}
           <ContactWbuyData
             document={contact.document}

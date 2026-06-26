@@ -44,7 +44,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       take: limit,
       orderBy: { updatedAt: "desc" },
       include: {
-        contact: { select: { id: true, name: true, avatarUrl: true } },
+        contact: {
+          select: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            tags: { select: { id: true, name: true, color: true }, orderBy: { name: "asc" } },
+          },
+        },
         channel: { select: { channelType: true } },
         agent: { select: { id: true, name: true } },
         messages: {
@@ -78,6 +85,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       name: c.contact.name,
       avatar_url: c.contact.avatarUrl,
     },
+    tags: c.contact.tags,
     last_message: c.messages[0]
       ? {
           content: c.messages[0].content,

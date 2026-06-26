@@ -12,6 +12,7 @@ import type { Role } from "@pleno-crm/types";
 interface ConversationItem {
   id: string;
   contact: { id: string; name: string; avatar_url: string | null };
+  tags: Array<{ id: string; name: string; color: string }>;
   last_message: { content: string | null; direction: "in" | "out"; sent_at: string } | null;
   unread_count: number;
   status: "open" | "pending" | "resolved";
@@ -39,6 +40,7 @@ interface ContactDetail {
   avatarUrl: string | null;
   notes: string | null;
   channels: Array<{ id: string; channelType: string; channelIdentifier: string }>;
+  tags: Array<{ id: string; name: string; color: string }>;
 }
 
 interface Agent {
@@ -104,6 +106,7 @@ export function InboxClient({ currentUserId, currentUserRole, agents }: Props) {
         avatarUrl: conv.contact.avatar_url,
         notes: null,
         channels: [],
+        tags: [],
       });
     }
   }, []);

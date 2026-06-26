@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Phone, Mail, CheckCircle, Clock, ExternalLink, Link2 } from "lucide-react";
 import { OrderHistory } from "./order-history";
 import { ChannelIcon } from "@/components/ui/channel-badge";
+import { TagEditor } from "@/components/ui/tag-editor";
+import type { TagData } from "@/components/ui/tag-chip";
 import type { Role } from "@pleno-crm/types";
 
 interface Channel {
@@ -21,6 +23,7 @@ interface Contact {
   avatarUrl: string | null;
   notes: string | null;
   channels: Channel[];
+  tags: TagData[];
 }
 
 interface ConversationMeta {
@@ -259,6 +262,14 @@ export function ContactPanel({
             </div>
           );
         })}
+
+      {/* Etiquetas */}
+      <div className="p-4 border-b border-border">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+          Etiquetas
+        </p>
+        <TagEditor key={contact.id} contactId={contact.id} initialTags={contact.tags} canEdit={canLink} />
+      </div>
 
       {/* Canais vinculados */}
       <div className="p-4 border-b border-border">

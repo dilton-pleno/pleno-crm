@@ -4,12 +4,14 @@ import { useState, useCallback } from "react";
 import { Search, MessageCircle, Clock } from "lucide-react";
 import { ChannelBadge, ChannelIcon } from "@/components/ui/channel-badge";
 import { getChannelMeta, FILTERABLE_CHANNELS } from "@/lib/channels";
+import { TagChip, type TagData } from "@/components/ui/tag-chip";
 
 type FilterTab = "all" | "mine" | "unassigned";
 
 interface ConversationItem {
   id: string;
   contact: { id: string; name: string; avatar_url: string | null };
+  tags: TagData[];
   last_message: { content: string | null; direction: "in" | "out"; sent_at: string } | null;
   unread_count: number;
   status: "open" | "pending" | "resolved";
@@ -57,11 +59,18 @@ interface Props {
 export function ConversationList({ conversations, selectedId, onSelect, currentUserId }: Props) {
   const [tab, setTab] = useState<FilterTab>("all");
   const [channelFilter, setChannelFilter] = useState<string | null>(null);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [waitingOnly, setWaitingOnly] = useState(false);
   const [search, setSearch] = useState("");
 
+  // Etiquetas presentes nas conversas carregadas (para o filtro).
+  const availableTags = Array.from(
+    new Map(conversations.flatMap((c) => c.tags).map((t) => [t.id, t])).values()
+  ).sort((a, b) => a.name.localeCompare(b.name));
+
   const filtered = conversations.filter((c) => {
     if (channelFilter && c.channel_type !== channelFilter) return false;
+    if (tagFilter && !c.tags.some((t) => t.id === tagFilter)) return false;
     if (waitingOnly && (slaWaitingMinutes(c) ?? 0) < SLA_WARN_MIN) return false;
     if (tab === "mine" && c.assigned_to?.id !== currentUserId) return false;
     if (tab === "unassigned" && c.assigned_to !== null) return false;
@@ -156,6 +165,22 @@ export function ConversationList({ conversations, selectedId, onSelect, currentU
         >
           <Clock className="w-3 h-3" /> Aguardando resposta
         </button>
+
+        {/* Filtro por etiqueta */}
+        {availableTags.length > 0 && (
+          <select
+            value={tagFilter ?? ""}
+            onChange={(e) => setTagFilter(e.target.value || null)}
+            className="mt-1.5 w-full text-xs bg-background border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring text-muted-foreground"
+          >
+            <option value="">Todas as etiquetas</option>
+            {availableTags.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Lista */}
@@ -222,6 +247,13 @@ export function ConversationList({ conversations, selectedId, onSelect, currentU
                     </span>
                   )}
                 </div>
+                {conv.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {conv.tags.map((t) => (
+                      <TagChip key={t.id} tag={t} size="xs" />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </button>
