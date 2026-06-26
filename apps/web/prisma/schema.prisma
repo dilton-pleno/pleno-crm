@@ -125,6 +125,20 @@ model WbuyReview {
   @@map("wbuy_reviews")
 }
 
+// Inscritos na newsletter da Wbuy (chave = email).
+model NewsletterSubscriber {
+  id         String    @id @default(uuid())
+  email      String    @unique
+  name       String?
+  phone      String?
+  gender     String?
+  subscribed Boolean   @default(true)
+  signupDate DateTime? @map("signup_date")
+  syncedAt   DateTime  @default(now()) @map("synced_at")
+
+  @@map("newsletter_subscribers")
+}
+
 // ============================================================
 // CONTATOS E CANAIS
 // ============================================================

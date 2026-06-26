@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ShoppingCart, DollarSign, Package, ShoppingBag, Star } from "lucide-react";
+import { ShoppingCart, DollarSign, Package, ShoppingBag, Star, Mail } from "lucide-react";
 
 interface RecentOrder {
   id: string;
@@ -113,6 +113,12 @@ export function EcommerceClient() {
             className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent text-foreground"
           >
             <Star className="w-3.5 h-3.5" /> Avaliações
+          </Link>
+          <Link
+            href="/ecommerce/newsletter"
+            className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent text-foreground"
+          >
+            <Mail className="w-3.5 h-3.5" /> Newsletter
           </Link>
         </div>
       </div>
