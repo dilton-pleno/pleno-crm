@@ -20,8 +20,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     data: notifications.map((n) => ({
       id: n.id,
       alert_id: n.alertId,
-      alert_name: n.alert.name,
+      alert_name: n.alert?.name ?? null,
       message: n.message,
+      // Notificações de sistema (ex.: avaliação) têm link próprio; alertas de
+      // campanha caem na tela de alertas.
+      link: n.link ?? "/campanhas/alertas",
       read_at: n.readAt?.toISOString() ?? null,
       created_at: n.createdAt.toISOString(),
     })),

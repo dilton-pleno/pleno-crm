@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ShoppingCart, DollarSign, Package, ShoppingBag } from "lucide-react";
+import { ShoppingCart, DollarSign, Package, ShoppingBag, Star } from "lucide-react";
 
 interface RecentOrder {
   id: string;
@@ -101,12 +101,20 @@ export function EcommerceClient() {
     <div className="flex flex-col h-full overflow-auto p-6 gap-5 max-w-5xl mx-auto w-full">
       <div className="flex items-center justify-between shrink-0">
         <h1 className="text-lg font-semibold text-foreground">Ecommerce</h1>
-        <Link
-          href="/ecommerce/produtos"
-          className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent text-foreground"
-        >
-          <Package className="w-3.5 h-3.5" /> Produtos
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/ecommerce/produtos"
+            className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent text-foreground"
+          >
+            <Package className="w-3.5 h-3.5" /> Produtos
+          </Link>
+          <Link
+            href="/ecommerce/avaliacoes"
+            className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent text-foreground"
+          >
+            <Star className="w-3.5 h-3.5" /> Avaliações
+          </Link>
+        </div>
       </div>
 
       {loading && !data ? (

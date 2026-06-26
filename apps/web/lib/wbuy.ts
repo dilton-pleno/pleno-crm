@@ -176,6 +176,29 @@ export async function getProducts(
   return request<WbuyProductRaw[]>(creds, `/product/?${qs.toString()}`);
 }
 
+// Shape (parcial) da avaliação conforme GET /product/review/.
+export interface WbuyReviewRaw {
+  id?: string;
+  produto_id?: string;
+  produto?: string;
+  nome?: string;
+  avaliacao?: string;
+  nota?: string;
+  data_avaliacao?: string;
+  data?: string;
+  ativo?: string;
+}
+
+export async function getReviews(
+  creds: WbuyCreds,
+  params: { limit?: string; data_de?: string } = {}
+): Promise<WbuyReviewRaw[]> {
+  const qs = new URLSearchParams();
+  if (params.data_de) qs.set("data_de", params.data_de);
+  qs.set("limit", params.limit ?? "0,100");
+  return request<WbuyReviewRaw[]>(creds, `/product/review/?${qs.toString()}`);
+}
+
 export async function listWebhooks(creds: WbuyCreds): Promise<WbuyWebhook[]> {
   const raw = await request<RawWebhook[]>(creds, "/webhook");
   return (Array.isArray(raw) ? raw : []).map((w) => ({
