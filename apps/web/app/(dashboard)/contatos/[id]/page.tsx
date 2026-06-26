@@ -8,6 +8,7 @@ import { ChannelIcon } from "@/components/ui/channel-badge";
 import { ContactEditCard } from "./contact-edit";
 import { ContactWbuyData } from "./contact-wbuy-data";
 import { TagEditor } from "@/components/ui/tag-editor";
+import { ContactNotes } from "@/components/inbox/contact-notes";
 import { OrderHistory } from "@/components/inbox/order-history";
 
 interface WbuyAddress {
@@ -90,13 +91,17 @@ export default async function ContatoPage({ params }: Props) {
         name={contact.name}
         email={contact.email}
         phone={contact.phone}
-        notes={contact.notes}
         canEdit={canEdit}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Coluna principal: histórico de conversas */}
+        {/* Coluna principal: notas internas + histórico de conversas */}
         <div className="md:col-span-2 flex flex-col gap-4">
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h2 className="text-sm font-semibold text-foreground mb-3">Notas internas</h2>
+            <ContactNotes contactId={contact.id} />
+          </div>
+
           <h2 className="text-sm font-semibold text-foreground">
             Histórico de conversas ({contact.conversations.length})
           </h2>
