@@ -147,6 +147,35 @@ function normalizeType(t: RawWebhook["type"]): string {
   return "";
 }
 
+// Shape (parcial) do produto conforme GET /product/ da Wbuy.
+export interface WbuyProductRaw {
+  id: string;
+  cod?: string;
+  produto?: string;
+  descricao?: string;
+  ativo?: string;
+  gtin?: string;
+  ncm?: string;
+  marca?: { nome?: string };
+  categoria_level1?: { nome?: string; url?: string };
+  estoque?: Array<{
+    quantidade_em_estoque?: string;
+    visualizacoes?: string;
+    valores?: Array<{ tabela_id?: string; valor?: string }>;
+  }>;
+}
+
+export async function getProducts(
+  creds: WbuyCreds,
+  params: { ativo?: string; limit?: string; order?: string } = {}
+): Promise<WbuyProductRaw[]> {
+  const qs = new URLSearchParams();
+  qs.set("ativo", params.ativo ?? "1");
+  qs.set("order", params.order ?? "produto,asc");
+  qs.set("limit", params.limit ?? "0,100");
+  return request<WbuyProductRaw[]>(creds, `/product/?${qs.toString()}`);
+}
+
 export async function listWebhooks(creds: WbuyCreds): Promise<WbuyWebhook[]> {
   const raw = await request<RawWebhook[]>(creds, "/webhook");
   return (Array.isArray(raw) ? raw : []).map((w) => ({

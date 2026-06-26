@@ -87,6 +87,27 @@ model AbandonedCart {
   @@map("abandoned_carts")
 }
 
+// Produtos ATIVOS da Wbuy (catálogo enxuto p/ cruzar vendas por SKU + SEO).
+model WbuyProduct {
+  id          String   @id @default(uuid())
+  externalId  String   @unique @map("external_id") // id do produto na Wbuy
+  cod         String?
+  name        String
+  description String?  @db.Text
+  brand       String?
+  category    String?
+  categoryUrl String?  @map("category_url")
+  gtin        String?
+  ncm         String?
+  price       Decimal  @default(0) @db.Decimal(12, 2)
+  stock       Int      @default(0)
+  views       Int      @default(0)
+  active      Boolean  @default(true)
+  syncedAt    DateTime @default(now()) @map("synced_at")
+
+  @@map("wbuy_products")
+}
+
 // ============================================================
 // CONTATOS E CANAIS
 // ============================================================

@@ -147,6 +147,22 @@ export function WbuyCard() {
     }
   }, []);
 
+  const syncProducts = useCallback(async () => {
+    setWorking(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/v1/integrations/wbuy/sync-products", { method: "POST" });
+      const json = await res.json();
+      setMessage(
+        res.ok
+          ? { kind: "ok", text: `Produtos ativos sincronizados: ${json.data.synced}` }
+          : { kind: "err", text: json.error?.message ?? "Falha ao sincronizar produtos" }
+      );
+    } finally {
+      setWorking(false);
+    }
+  }, []);
+
   const loadWebhooks = useCallback(async () => {
     const res = await fetch("/api/v1/integrations/wbuy/webhooks");
     if (res.ok) {
@@ -280,6 +296,13 @@ export function WbuyCard() {
                 className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
               >
                 Importar histórico
+              </button>
+              <button
+                onClick={() => void syncProducts()}
+                disabled={working}
+                className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
+              >
+                Sincronizar produtos
               </button>
               <button
                 onClick={() => void loadWebhooks()}
