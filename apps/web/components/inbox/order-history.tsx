@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ShoppingBag, ChevronDown, ChevronRight } from "lucide-react";
+import { ShoppingBag, ChevronDown, ChevronRight, Truck, Copy, Check, ExternalLink } from "lucide-react";
 
 interface OrderItem {
   name: string;
@@ -16,6 +16,9 @@ interface Order {
   total: number;
   created_at: string;
   items: OrderItem[];
+  tracking: string | null;
+  carrier: string | null;
+  tracking_url: string | null;
 }
 
 function statusColor(status: string): string {
@@ -28,6 +31,45 @@ function statusColor(status: string): string {
 
 function fmtCurrency(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function TrackingLine({ order }: { order: Order }) {
+  const [copied, setCopied] = useState(false);
+  if (!order.tracking) return null;
+
+  return (
+    <div className="mt-1 pt-1.5 border-t border-border/60 flex items-center gap-1.5 text-[11px]">
+      <Truck className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+      <span className="text-muted-foreground">{order.carrier ?? "Rastreio"}:</span>
+      <span className="text-foreground font-medium truncate">{order.tracking}</span>
+      <button
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(order.tracking ?? "");
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          } catch {
+            /* clipboard indisponível */
+          }
+        }}
+        className="p-0.5 text-muted-foreground hover:text-foreground flex-shrink-0"
+        title="Copiar código de rastreio"
+      >
+        {copied ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
+      </button>
+      {order.tracking_url && (
+        <a
+          href={order.tracking_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-0.5 text-muted-foreground hover:text-foreground flex-shrink-0"
+          title="Abrir rastreamento"
+        >
+          <ExternalLink className="w-3 h-3" />
+        </a>
+      )}
+    </div>
+  );
 }
 
 export function OrderHistory({ contactId, compact = false }: { contactId: string; compact?: boolean }) {
@@ -79,6 +121,9 @@ export function OrderHistory({ contactId, compact = false }: { contactId: string
               <span className="text-xs font-medium text-foreground truncate flex-1">
                 #{o.external_id}
               </span>
+              {o.tracking && (
+                <Truck className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" aria-label="Com rastreio" />
+              )}
               <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${statusColor(o.status)}`}>
                 {o.status}
               </span>
@@ -107,6 +152,7 @@ export function OrderHistory({ contactId, compact = false }: { contactId: string
                     </div>
                   ))
                 )}
+                <TrackingLine order={o} />
               </div>
             )}
           </div>

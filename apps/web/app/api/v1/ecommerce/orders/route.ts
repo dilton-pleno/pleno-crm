@@ -41,6 +41,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       status: o.status,
       total: dec(o.total),
       created_at: o.createdAt.toISOString(),
+      tracking: o.tracking,
+      carrier: o.carrier,
+      tracking_url: o.trackingUrl,
     })),
     meta: { total, page, limit },
   });

@@ -25,6 +25,9 @@ export async function GET(
       total: Number(o.total),
       created_at: o.createdAt.toISOString(),
       items: o.items ?? [],
+      tracking: o.tracking,
+      carrier: o.carrier,
+      tracking_url: o.trackingUrl,
     })),
   });
 }
