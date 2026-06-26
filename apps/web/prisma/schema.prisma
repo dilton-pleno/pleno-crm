@@ -108,6 +108,23 @@ model WbuyProduct {
   @@map("wbuy_products")
 }
 
+// Avaliações de produtos (Wbuy não tem webhook de avaliação → polling).
+model WbuyReview {
+  id           String    @id @default(uuid())
+  externalId   String    @unique @map("external_id")
+  productId    String?   @map("product_id")
+  productName  String?   @map("product_name")
+  customerName String?   @map("customer_name")
+  rating       Int       @default(0)
+  comment      String?   @db.Text
+  approved     Boolean   @default(false)
+  reviewDate   DateTime? @map("review_date")
+  alertedAt    DateTime? @map("alerted_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@map("wbuy_reviews")
+}
+
 // ============================================================
 // CONTATOS E CANAIS
 // ============================================================
@@ -353,13 +370,14 @@ model Alert {
 }
 
 model AlertNotification {
-  id        String   @id @default(uuid())
-  alertId   String   @map("alert_id")
+  id        String    @id @default(uuid())
+  alertId   String?   @map("alert_id") // null = notificação de sistema (ex.: nova avaliação)
   message   String
+  link      String? // destino ao clicar (default: alertas de campanha)
   readAt    DateTime? @map("read_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
-  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  alert Alert? @relation(fields: [alertId], references: [id], onDelete: Cascade)
 
   @@map("alert_notifications")
 }

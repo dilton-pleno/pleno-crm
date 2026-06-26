@@ -41,14 +41,14 @@ export function Header({ userName, userRole }: HeaderProps) {
       const res = await fetch("/api/v1/alerts/notifications");
       if (!res.ok) return;
       const json = (await res.json()) as {
-        data: Array<{ id: string; message: string }>;
+        data: Array<{ id: string; message: string; link?: string }>;
       };
       setNotifications((prev) => {
         const ephemeral = prev.filter((n) => n.kind === "ephemeral");
         const alerts: Notification[] = json.data.map((n) => ({
           id: n.id,
           message: n.message,
-          href: "/campanhas/alertas",
+          href: n.link ?? "/campanhas/alertas",
           kind: "alert" as const,
         }));
         return [...alerts, ...ephemeral];
