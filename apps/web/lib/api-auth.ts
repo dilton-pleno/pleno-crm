@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { Session } from "next-auth";
-import type { Module } from "@pleno-crm/types";
+import type { Module, Role } from "@pleno-crm/types";
 import { auth } from "@/lib/auth";
 import { getAccessLevel } from "@/lib/permissions";
 
@@ -49,5 +49,33 @@ export async function requireAccess(
     };
   }
 
+  return { ok: true, session };
+}
+
+/**
+ * Valida sessão e exige que o papel esteja na lista permitida. Útil para ações
+ * cujo módulo é `full` para todos os papéis (ex.: kanban) mas que só ADMIN/GESTOR
+ * podem executar — como CRUD de pipelines, tags e respostas rápidas.
+ */
+export async function requireRoles(roles: Role[]): Promise<GuardResult> {
+  const session = await auth();
+  if (!session) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: { code: "UNAUTHORIZED", message: "Não autenticado" } },
+        { status: 401 }
+      ),
+    };
+  }
+  if (!roles.includes(session.user.role as Role)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: { code: "FORBIDDEN", message: "Sem permissão para esta ação" } },
+        { status: 403 }
+      ),
+    };
+  }
   return { ok: true, session };
 }

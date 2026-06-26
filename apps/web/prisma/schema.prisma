@@ -266,6 +266,7 @@ model Message {
 model Pipeline {
   id        String   @id @default(uuid())
   name      String
+  isDefault Boolean  @default(false) @map("is_default")
   createdBy String   @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
 

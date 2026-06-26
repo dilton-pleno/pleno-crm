@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, ArrowUp, ArrowDown, Trash2, Check, X } from "lucide-react";
 
 interface Stage {
@@ -11,13 +12,21 @@ interface Stage {
   card_count: number;
 }
 
+interface PipelineOption {
+  id: string;
+  name: string;
+  is_default: boolean;
+}
+
 interface Props {
   pipelineId: string;
   pipelineName: string;
+  pipelines: PipelineOption[];
   initialStages: Stage[];
 }
 
-export function PipelineConfigClient({ pipelineId, pipelineName, initialStages }: Props) {
+export function PipelineConfigClient({ pipelineId, pipelineName, pipelines, initialStages }: Props) {
+  const router = useRouter();
   const [stages, setStages] = useState<Stage[]>(initialStages);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState("#6366f1");
@@ -124,9 +133,25 @@ export function PipelineConfigClient({ pipelineId, pipelineName, initialStages }
 
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-6 max-w-2xl mx-auto w-full">
-      <div>
-        <h1 className="text-lg font-semibold text-foreground">Configuração do pipeline</h1>
-        <p className="text-sm text-muted-foreground">{pipelineName}</p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">Configuração do pipeline</h1>
+          <p className="text-sm text-muted-foreground">Estágios de {pipelineName}</p>
+        </div>
+        {pipelines.length > 1 && (
+          <select
+            value={pipelineId}
+            onChange={(e) => router.push(`/configuracoes/pipeline?pipeline=${e.target.value}`)}
+            className="text-sm bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            {pipelines.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+                {p.is_default ? " ★" : ""}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {error && (

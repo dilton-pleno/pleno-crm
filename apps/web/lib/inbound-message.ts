@@ -89,19 +89,25 @@ export async function ingestInboundMessage(msg: InboundMessage): Promise<void> {
       },
     });
 
-    // Cria automaticamente um card no Kanban, no estágio inicial ("Novo").
-    const novoStage = await prisma.pipelineStage.findFirst({
-      where: { name: { equals: "Novo", mode: "insensitive" } },
-      orderBy: { position: "asc" },
-    });
-    if (novoStage) {
-      await prisma.pipelineCard.create({
-        data: {
-          stageId: novoStage.id,
-          conversationId: conversation.id,
-          contactId,
-        },
+    // Cria automaticamente um card no primeiro estágio do pipeline padrão
+    // (isDefault; fallback para o pipeline mais antigo).
+    const defaultPipeline =
+      (await prisma.pipeline.findFirst({ where: { isDefault: true } })) ??
+      (await prisma.pipeline.findFirst({ orderBy: { createdAt: "asc" } }));
+    if (defaultPipeline) {
+      const firstStage = await prisma.pipelineStage.findFirst({
+        where: { pipelineId: defaultPipeline.id },
+        orderBy: { position: "asc" },
       });
+      if (firstStage) {
+        await prisma.pipelineCard.create({
+          data: {
+            stageId: firstStage.id,
+            conversationId: conversation.id,
+            contactId,
+          },
+        });
+      }
     }
   }
 
