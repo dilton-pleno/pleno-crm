@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ArrowUp, ArrowDown, Trash2, Check, X } from "lucide-react";
+import { Plus, ArrowUp, ArrowDown, Trash2, Check, X, Settings } from "lucide-react";
+import { PipelineManager } from "@/components/kanban/pipeline-manager";
 
 interface Stage {
   id: string;
@@ -28,6 +29,7 @@ interface Props {
 export function PipelineConfigClient({ pipelineId, pipelineName, pipelines, initialStages }: Props) {
   const router = useRouter();
   const [stages, setStages] = useState<Stage[]>(initialStages);
+  const [manageOpen, setManageOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState("#6366f1");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -138,21 +140,41 @@ export function PipelineConfigClient({ pipelineId, pipelineName, pipelines, init
           <h1 className="text-lg font-semibold text-foreground">Configuração do pipeline</h1>
           <p className="text-sm text-muted-foreground">Estágios de {pipelineName}</p>
         </div>
-        {pipelines.length > 1 && (
-          <select
-            value={pipelineId}
-            onChange={(e) => router.push(`/configuracoes/pipeline?pipeline=${e.target.value}`)}
-            className="text-sm bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+        <div className="flex items-center gap-2">
+          {pipelines.length > 1 && (
+            <select
+              value={pipelineId}
+              onChange={(e) => router.push(`/configuracoes/pipeline?pipeline=${e.target.value}`)}
+              className="text-sm bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              {pipelines.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                  {p.is_default ? " ★" : ""}
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            onClick={() => setManageOpen(true)}
+            className="flex items-center gap-1 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent text-foreground"
           >
-            {pipelines.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-                {p.is_default ? " ★" : ""}
-              </option>
-            ))}
-          </select>
-        )}
+            <Settings className="w-3.5 h-3.5" /> Gerenciar pipelines
+          </button>
+        </div>
       </div>
+
+      {manageOpen && (
+        <PipelineManager
+          pipelines={pipelines}
+          currentPipelineId={pipelineId}
+          onClose={() => setManageOpen(false)}
+          onChanged={(nextSelected) => {
+            if (nextSelected) router.push(`/configuracoes/pipeline?pipeline=${nextSelected}`);
+            else router.refresh();
+          }}
+        />
+      )}
 
       {error && (
         <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">

@@ -18,6 +18,7 @@ export function TagEditor({ contactId, initialTags, canEdit = false, onChange }:
   const [allTags, setAllTags] = useState<TagData[]>([]);
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newColor, setNewColor] = useState(PALETTE[0] ?? "#6366f1");
   const [busy, setBusy] = useState(false);
 
   const update = useCallback(
@@ -65,11 +66,10 @@ export function TagEditor({ contactId, initialTags, canEdit = false, onChange }:
     if (!name || busy) return;
     setBusy(true);
     try {
-      const color = PALETTE[allTags.length % PALETTE.length];
       const res = await fetch("/api/v1/tags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, color }),
+        body: JSON.stringify({ name, color: newColor }),
       });
       if (res.ok) {
         const json = (await res.json()) as { data: TagData };
@@ -80,7 +80,7 @@ export function TagEditor({ contactId, initialTags, canEdit = false, onChange }:
     } finally {
       setBusy(false);
     }
-  }, [newName, busy, allTags.length, attach]);
+  }, [newName, newColor, busy, attach]);
 
   const available = allTags.filter((t) => !tags.some((sel) => sel.id === t.id));
 
@@ -106,24 +106,38 @@ export function TagEditor({ contactId, initialTags, canEdit = false, onChange }:
             <>
               <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
               <div className="absolute z-20 mt-1 w-52 bg-card border border-border rounded-md shadow-lg p-2 flex flex-col gap-1.5">
-                <div className="flex items-center gap-1">
-                  <input
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void createAndAttach();
-                    }}
-                    placeholder="Nova etiqueta…"
-                    className="flex-1 text-xs bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <button
-                    onClick={() => void createAndAttach()}
-                    disabled={!newName.trim() || busy}
-                    className="p-1 text-primary hover:bg-accent rounded disabled:opacity-40"
-                    title="Criar e aplicar"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1">
+                    <input
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void createAndAttach();
+                      }}
+                      placeholder="Nova etiqueta…"
+                      className="flex-1 text-xs bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                    <button
+                      onClick={() => void createAndAttach()}
+                      disabled={!newName.trim() || busy}
+                      className="p-1 text-primary hover:bg-accent rounded disabled:opacity-40"
+                      title="Criar e aplicar"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {PALETTE.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setNewColor(c)}
+                        className={`w-4 h-4 rounded-full border ${newColor.toLowerCase() === c ? "ring-2 ring-offset-1 ring-foreground/40" : "border-border"}`}
+                        style={{ backgroundColor: c }}
+                        title={c}
+                      />
+                    ))}
+                  </div>
                 </div>
                 <div className="max-h-40 overflow-y-auto flex flex-col gap-0.5">
                   {available.length === 0 ? (
