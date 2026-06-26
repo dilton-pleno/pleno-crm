@@ -99,7 +99,15 @@ export function EcommerceClient() {
 
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-5 max-w-5xl mx-auto w-full">
-      <h1 className="text-lg font-semibold text-foreground">Ecommerce</h1>
+      <div className="flex items-center justify-between shrink-0">
+        <h1 className="text-lg font-semibold text-foreground">Ecommerce</h1>
+        <Link
+          href="/ecommerce/produtos"
+          className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent text-foreground"
+        >
+          <Package className="w-3.5 h-3.5" /> Produtos
+        </Link>
+      </div>
 
       {loading && !data ? (
         <p className="text-sm text-muted-foreground py-12 text-center">Carregando...</p>
