@@ -1,14 +1,23 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, X, QrCode, MessageCircle, CheckCircle2, AlertCircle } from "lucide-react";
+import { RefreshCw, X, QrCode, MessageCircle, CheckCircle2, AlertCircle, History } from "lucide-react";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { WbuyCard } from "./wbuy-card";
+
+interface HistoryImport {
+  status: "running" | "done" | "error";
+  chats: number;
+  imported: number;
+  start: string;
+  finishedAt?: string;
+}
 
 interface WhatsAppStatus {
   status: "connected" | "disconnected";
   number: string | null;
   instanceName: string;
+  historyImport: HistoryImport | null;
 }
 
 interface Props {
@@ -118,6 +127,24 @@ export function IntegracoesClient({ currentUserId, canManage, isAdmin }: Props) 
     void fetchStatus();
   }, [fetchStatus]);
 
+  const importHistory = useCallback(async () => {
+    if (!confirm("Importar o histórico de conversas do WhatsApp dos últimos 90 dias? Roda em segundo plano.")) {
+      return;
+    }
+    setWorking(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/v1/integrations/whatsapp/import-history", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) setError(json.error?.message ?? "Falha ao iniciar importação");
+      await fetchStatus();
+    } finally {
+      setWorking(false);
+    }
+  }, [fetchStatus]);
+
+  const history = status?.historyImport ?? null;
+
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-4 max-w-2xl mx-auto w-full">
       <h1 className="text-lg font-semibold text-foreground">Integrações</h1>
@@ -221,6 +248,39 @@ export function IntegracoesClient({ currentUserId, canManage, isAdmin }: Props) 
             </button>
           )}
         </div>
+
+        {/* Importação de histórico (Admin/Gestor) */}
+        {canManage && (
+          <div className="border-t border-border pt-4 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <p className="text-sm font-medium text-foreground">Histórico de conversas</p>
+                <p className="text-xs text-muted-foreground">
+                  Importa os últimos 90 dias (todos os chats, só texto).
+                </p>
+              </div>
+              <button
+                onClick={() => void importHistory()}
+                disabled={working || history?.status === "running"}
+                className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
+              >
+                <History className="w-3.5 h-3.5" />
+                {history?.status === "running" ? "Importando..." : "Importar histórico (90 dias)"}
+              </button>
+            </div>
+            {history && (
+              <div className="text-[11px] text-muted-foreground">
+                {history.status === "running" && `Em andamento… ${history.imported} mensagens (${history.chats} chats)`}
+                {history.status === "done" &&
+                  `Concluída — ${history.imported} mensagens de ${history.chats} chats.`}
+                {history.status === "error" && `Falhou (importadas ${history.imported}).`}
+              </div>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              Traz apenas o que a Evolution tem armazenado; instância recente pode ter menos de 90 dias.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Card Wbuy (e-commerce) — gestão de credenciais só para Admin */}

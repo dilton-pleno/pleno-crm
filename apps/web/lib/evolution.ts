@@ -216,6 +216,110 @@ export async function getBase64FromMediaMessage(
   };
 }
 
+// ============================================================
+// Histórico (backfill) — leitura de chats e mensagens armazenadas
+// ============================================================
+
+export interface WaMessageKey {
+  id: string;
+  remoteJid: string;
+  fromMe: boolean;
+}
+
+// Mesma forma das mensagens do webhook (messages.upsert).
+export interface WaMessageRecord {
+  key: WaMessageKey;
+  message?: {
+    conversation?: string;
+    extendedTextMessage?: { text?: string };
+    imageMessage?: { caption?: string };
+    audioMessage?: Record<string, unknown>;
+    documentMessage?: { fileName?: string; title?: string; caption?: string };
+    stickerMessage?: Record<string, unknown>;
+    videoMessage?: { caption?: string };
+  };
+  messageTimestamp?: number | string;
+  pushName?: string;
+}
+
+export interface WaChat {
+  remoteJid: string;
+  name: string | null;
+}
+
+interface RawChat {
+  remoteJid?: string;
+  id?: string;
+  jid?: string;
+  name?: string;
+  pushName?: string;
+}
+
+/**
+ * Lista os chats da instância via POST /chat/findChats. A forma varia entre
+ * versões (array direto ou { chats: [...] }); normalizamos para { remoteJid, name }.
+ */
+export async function findChats(instanceName: string): Promise<WaChat[]> {
+  const res = await fetch(`${baseUrl()}/chat/findChats/${instanceName}`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Evolution findChats falhou [${res.status}]: ${body}`);
+  }
+  const json = (await res.json()) as RawChat[] | { chats?: RawChat[] };
+  const list = Array.isArray(json) ? json : json.chats ?? [];
+  return list
+    .map((c) => ({
+      remoteJid: c.remoteJid ?? c.id ?? c.jid ?? "",
+      name: c.name ?? c.pushName ?? null,
+    }))
+    .filter((c) => c.remoteJid);
+}
+
+interface FindMessagesResult {
+  records: WaMessageRecord[];
+  pages: number;
+  currentPage: number;
+}
+
+/**
+ * Busca mensagens de um chat via POST /chat/findMessages. Trata a forma v2
+ * ({ messages: { records, pages, currentPage } }) e a forma de array direto.
+ */
+export async function findMessages(
+  instanceName: string,
+  params: { remoteJid: string; page?: number }
+): Promise<FindMessagesResult> {
+  const res = await fetch(`${baseUrl()}/chat/findMessages/${instanceName}`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      where: { key: { remoteJid: params.remoteJid } },
+      page: params.page ?? 1,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Evolution findMessages falhou [${res.status}]: ${body}`);
+  }
+  const json = (await res.json()) as
+    | WaMessageRecord[]
+    | { messages?: { records?: WaMessageRecord[]; pages?: number; currentPage?: number } };
+
+  if (Array.isArray(json)) {
+    return { records: json, pages: 1, currentPage: 1 };
+  }
+  const m = json.messages ?? {};
+  return {
+    records: Array.isArray(m.records) ? m.records : [],
+    pages: m.pages ?? 1,
+    currentPage: m.currentPage ?? params.page ?? 1,
+  };
+}
+
 export async function sendMedia(
   instanceName: string,
   to: string,

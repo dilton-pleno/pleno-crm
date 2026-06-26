@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
 import { fetchInstanceStatus } from "@/lib/evolution";
+import { getBackfillProgress } from "@/lib/whatsapp-backfill";
 
 export async function GET(): Promise<NextResponse> {
   // Status pode ser consultado por qualquer role com acesso a integrações.
@@ -22,7 +23,8 @@ export async function GET(): Promise<NextResponse> {
 
   try {
     const status = await fetchInstanceStatus(instanceName);
-    return NextResponse.json({ data: status });
+    const historyImport = await getBackfillProgress();
+    return NextResponse.json({ data: { ...status, historyImport } });
   } catch (err) {
     console.error("[integrations] Erro ao consultar status do WhatsApp:", err);
     return NextResponse.json(
