@@ -93,10 +93,20 @@ export interface WbuyOrder {
   valor_total?: { subtotal?: string; desconto?: string; total?: string };
   frete?: { rastreio?: string; nome?: string; valor?: string; prazo?: string };
   cliente?: {
+    id?: string;
     nome?: string;
     email?: string;
     telefone1?: string;
     telefone2?: string;
+    doc1?: string;
+    doc2?: string;
+    cep?: string;
+    endereco?: string;
+    endnum?: string;
+    bairro?: string;
+    complemento?: string;
+    cidade?: string;
+    uf?: string;
   };
   produtos?: Array<{
     produto?: string;
@@ -197,6 +207,44 @@ export async function getReviews(
   if (params.data_de) qs.set("data_de", params.data_de);
   qs.set("limit", params.limit ?? "0,100");
   return request<WbuyReviewRaw[]>(creds, `/product/review/?${qs.toString()}`);
+}
+
+// Endereço do cliente (GET /customer/ → enderecos[]).
+export interface WbuyCustomerAddress {
+  id?: string;
+  local?: string;
+  cep?: string;
+  endereco?: string;
+  endnum?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
+}
+
+// Shape (parcial) do cliente conforme GET /customer/.
+export interface WbuyCustomerRaw {
+  id?: string;
+  nome?: string;
+  doc1?: string; // CPF/CNPJ
+  doc2?: string; // RG/IE
+  telefone1?: string;
+  telefone2?: string;
+  nascimento?: string; // "AAAA-MM-DD"
+  email?: string;
+  cidade?: string;
+  uf?: string;
+  ativo?: string;
+  enderecos?: WbuyCustomerAddress[];
+}
+
+export async function getCustomers(
+  creds: WbuyCreds,
+  params: { limit?: string } = {}
+): Promise<WbuyCustomerRaw[]> {
+  const qs = new URLSearchParams();
+  qs.set("limit", params.limit ?? "0,100");
+  return request<WbuyCustomerRaw[]>(creds, `/customer/?${qs.toString()}`);
 }
 
 // Shape do inscrito de newsletter (GET /newsletter/). Chave = email.

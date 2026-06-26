@@ -159,6 +159,16 @@ model Contact {
   avatarUrl      String?   @map("avatar_url")
   notes          String?
   organizationId String?   @map("organization_id")
+  // Dados enriquecidos da Wbuy (clientes / pedidos)
+  document       String?   @map("document")           // doc1 (CPF/CNPJ)
+  document2      String?   @map("document2")           // doc2 (RG/IE)
+  birthDate      DateTime? @map("birth_date")
+  gender         String?
+  city           String?
+  uf             String?
+  secondaryPhone String?   @map("secondary_phone")     // telefone2
+  addresses      Json?                                 // lista de enderecos da Wbuy
+  wbuyCustomerId String?   @map("wbuy_customer_id")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 

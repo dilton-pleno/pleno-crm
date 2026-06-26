@@ -5,7 +5,23 @@ import { auth } from "@/lib/auth";
 import { getAccessLevel } from "@/lib/permissions";
 import { MessageCircle, Hash, ArrowLeft } from "lucide-react";
 import { ContactEditCard } from "./contact-edit";
+import { ContactWbuyData } from "./contact-wbuy-data";
 import { OrderHistory } from "@/components/inbox/order-history";
+
+interface WbuyAddress {
+  local?: string | null;
+  cep?: string | null;
+  endereco?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+}
+
+function parseAddresses(value: unknown): WbuyAddress[] {
+  return Array.isArray(value) ? (value as WbuyAddress[]) : [];
+}
 
 const CHANNEL_LABELS: Record<string, string> = {
   whatsapp: "WhatsApp",
@@ -131,6 +147,18 @@ export default async function ContatoPage({ params }: Props) {
 
         {/* Coluna lateral: canais e pedidos */}
         <div className="flex flex-col gap-4">
+          {/* Dados enriquecidos da Wbuy */}
+          <ContactWbuyData
+            document={contact.document}
+            document2={contact.document2}
+            birthDate={contact.birthDate?.toISOString() ?? null}
+            gender={contact.gender}
+            secondaryPhone={contact.secondaryPhone}
+            city={contact.city}
+            uf={contact.uf}
+            addresses={parseAddresses(contact.addresses)}
+          />
+
           {/* Canais vinculados */}
           <div className="bg-card border border-border rounded-lg p-4">
             <h2 className="text-sm font-semibold text-foreground mb-3">Canais vinculados</h2>

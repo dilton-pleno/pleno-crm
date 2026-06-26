@@ -1,6 +1,13 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import type { WbuyOrder, WbuyAbandonedCart } from "@/lib/wbuy";
+import type { WbuyOrder, WbuyAbandonedCart, WbuyCustomerAddress } from "@/lib/wbuy";
+import {
+  digits,
+  isPlaceholderName,
+  buildContactUpdate,
+  mapAddress,
+  CONTACT_ENRICH_SELECT,
+} from "@/lib/wbuy-customer";
 
 interface OrderItem {
   name: string;
@@ -9,43 +16,93 @@ interface OrderItem {
   sku: string | null;
 }
 
-function digits(s: string | undefined | null): string {
-  return (s ?? "").replace(/\D/g, "");
-}
-
 function parseOrderDate(data: string | undefined): Date {
   if (!data) return new Date();
   const d = new Date(data.replace(" ", "T"));
   return Number.isNaN(d.getTime()) ? new Date() : d;
 }
 
+/** Converte o endereço inline do cliente do pedido no formato de endereço Wbuy. */
+function inlineAddress(cliente: NonNullable<WbuyOrder["cliente"]>): WbuyCustomerAddress | null {
+  if (!cliente.endereco?.trim() && !cliente.cep?.trim()) return null;
+  return {
+    cep: cliente.cep,
+    endereco: cliente.endereco,
+    endnum: cliente.endnum,
+    bairro: cliente.bairro,
+    complemento: cliente.complemento,
+    cidade: cliente.cidade,
+    uf: cliente.uf,
+  };
+}
+
 /**
  * Acha o contato do pedido por email ou telefone; cria um novo se não existir.
  * O telefone é comparado pelos últimos 8 dígitos (formatos divergem entre Wbuy
- * e os canais de atendimento).
+ * e os canais de atendimento). Em ambos os casos enriquece o contato com os
+ * dados do cliente do pedido (CPF, cidade/UF, endereço, telefone secundário) e
+ * corrige nomes placeholder.
  */
 async function findOrCreateContact(cliente: WbuyOrder["cliente"]): Promise<string> {
   const email = cliente?.email?.trim().toLowerCase() || null;
   const phoneDigits = digits(cliente?.telefone2 || cliente?.telefone1);
+  const phone1Digits = digits(cliente?.telefone1);
+
+  const select = CONTACT_ENRICH_SELECT;
 
   let contact = email
-    ? await prisma.contact.findFirst({ where: { email: { equals: email, mode: "insensitive" } } })
+    ? await prisma.contact.findFirst({
+        where: { email: { equals: email, mode: "insensitive" } },
+        select,
+      })
     : null;
 
   if (!contact && phoneDigits.length >= 8) {
     contact = await prisma.contact.findFirst({
       where: { phone: { endsWith: phoneDigits.slice(-8) } },
+      select,
     });
   }
 
+  const addr = cliente ? inlineAddress(cliente) : null;
+
   if (!contact) {
-    contact = await prisma.contact.create({
+    const created = await prisma.contact.create({
       data: {
-        name: cliente?.nome?.trim() || "Cliente Wbuy",
+        name: cliente?.nome?.trim() && !isPlaceholderName(cliente.nome)
+          ? cliente.nome.trim()
+          : "Cliente Wbuy",
         email,
-        phone: phoneDigits || null,
+        // usa o telefone1 como principal; telefone2 vira secundário
+        phone: phone1Digits || phoneDigits || null,
+        secondaryPhone: phoneDigits && phoneDigits !== phone1Digits ? phoneDigits : null,
+        document: cliente?.doc1?.trim() || null,
+        document2: cliente?.doc2?.trim() || null,
+        city: cliente?.cidade?.trim() || null,
+        uf: cliente?.uf?.trim() || null,
+        wbuyCustomerId: cliente?.id ? String(cliente.id) : null,
+        addresses: addr ? ([mapAddress(addr)] as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     });
+    return created.id;
+  }
+
+  // Contato já existe: enriquece preenchendo lacunas e corrigindo nome placeholder.
+  const update = buildContactUpdate(contact, {
+    name: cliente?.nome,
+    email,
+    phone: phone1Digits || phoneDigits || null,
+    document: cliente?.doc1?.trim() || null,
+    document2: cliente?.doc2?.trim() || null,
+    secondaryPhone: cliente?.telefone2 ? digits(cliente.telefone2) : null,
+    city: cliente?.cidade?.trim() || null,
+    uf: cliente?.uf?.trim() || null,
+    wbuyCustomerId: cliente?.id ? String(cliente.id) : null,
+    addresses: addr ? [mapAddress(addr)] : null,
+  });
+
+  if (Object.keys(update).length > 0) {
+    await prisma.contact.update({ where: { id: contact.id }, data: update });
   }
 
   return contact.id;

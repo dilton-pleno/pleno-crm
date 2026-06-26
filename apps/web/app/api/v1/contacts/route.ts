@@ -47,6 +47,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     email: c.email,
     phone: c.phone,
     avatar_url: c.avatarUrl,
+    city: c.city,
+    uf: c.uf,
     channels: c.channels.map((ch) => ({ id: ch.id, channel_type: ch.channelType })),
     last_interaction_at: c.conversations[0]?.updatedAt.toISOString() ?? null,
   }));
