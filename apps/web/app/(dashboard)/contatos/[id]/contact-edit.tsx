@@ -9,11 +9,10 @@ interface Props {
   name: string;
   email: string | null;
   phone: string | null;
-  notes: string | null;
   canEdit: boolean;
 }
 
-export function ContactEditCard({ id, name, email, phone, notes, canEdit }: Props) {
+export function ContactEditCard({ id, name, email, phone, canEdit }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -21,7 +20,6 @@ export function ContactEditCard({ id, name, email, phone, notes, canEdit }: Prop
     name,
     email: email ?? "",
     phone: phone ?? "",
-    notes: notes ?? "",
   });
 
   const handleSave = useCallback(async () => {
@@ -35,7 +33,6 @@ export function ContactEditCard({ id, name, email, phone, notes, canEdit }: Prop
           name: form.name.trim(),
           email: form.email.trim() || null,
           phone: form.phone.trim() || null,
-          notes: form.notes.trim() || null,
         }),
       });
       if (res.ok) {
@@ -68,13 +65,6 @@ export function ContactEditCard({ id, name, email, phone, notes, canEdit }: Prop
           placeholder="E-mail"
           className="text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
         />
-        <textarea
-          value={form.notes}
-          onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-          placeholder="Anotações"
-          rows={3}
-          className="text-sm bg-background border border-border rounded-md px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-ring"
-        />
         <div className="flex items-center gap-2">
           <button
             onClick={() => void handleSave()}
@@ -85,7 +75,7 @@ export function ContactEditCard({ id, name, email, phone, notes, canEdit }: Prop
           </button>
           <button
             onClick={() => {
-              setForm({ name, email: email ?? "", phone: phone ?? "", notes: notes ?? "" });
+              setForm({ name, email: email ?? "", phone: phone ?? "" });
               setEditing(false);
             }}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:bg-accent rounded-md px-3 py-1.5"
@@ -129,12 +119,6 @@ export function ContactEditCard({ id, name, email, phone, notes, canEdit }: Prop
           </button>
         )}
       </div>
-
-      {notes && (
-        <div className="mt-4 pt-4 border-t border-border">
-          <p className="text-sm text-muted-foreground">{notes}</p>
-        </div>
-      )}
     </div>
   );
 }
