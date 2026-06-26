@@ -33,6 +33,7 @@ model User {
   pipelines             Pipeline[]     @relation("CreatedBy")
   alerts                Alert[]        @relation("CreatedBy")
   automations           Automation[]   @relation("CreatedBy")
+  quickReplies          QuickReply[]   @relation("QuickReplyCreator")
 
   integrationRequestsMade     IntegrationRequest[] @relation("RequestedBy")
   integrationRequestsApproved IntegrationRequest[] @relation("ApprovedBy")
@@ -190,6 +191,20 @@ model Tag {
   contacts Contact[]
 
   @@map("tags")
+}
+
+model QuickReply {
+  id        String   @id @default(uuid())
+  title     String
+  content   String   @db.Text
+  shared    Boolean  @default(false)
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  creator User @relation("QuickReplyCreator", fields: [createdBy], references: [id])
+
+  @@map("quick_replies")
 }
 
 model ContactChannel {
