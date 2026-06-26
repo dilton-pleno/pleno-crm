@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ShoppingCart, DollarSign, Package, ShoppingBag, Star, Mail } from "lucide-react";
+import { ShoppingCart, DollarSign, Package, ShoppingBag, Star, Mail, Truck } from "lucide-react";
 
 interface RecentOrder {
   id: string;
@@ -12,6 +12,9 @@ interface RecentOrder {
   status: string;
   total: number;
   created_at: string;
+  tracking: string | null;
+  carrier: string | null;
+  tracking_url: string | null;
 }
 
 interface Overview {
@@ -186,6 +189,7 @@ export function EcommerceClient() {
                       <th className="text-left font-medium px-4 py-2">Pedido</th>
                       <th className="text-left font-medium px-4 py-2">Cliente</th>
                       <th className="text-left font-medium px-4 py-2">Status</th>
+                      <th className="text-left font-medium px-4 py-2">Rastreio</th>
                       <th className="text-left font-medium px-4 py-2">Data</th>
                       <th className="text-right font-medium px-4 py-2">Total</th>
                     </tr>
@@ -203,6 +207,30 @@ export function EcommerceClient() {
                           <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${statusColor(o.status)}`}>
                             {o.status}
                           </span>
+                        </td>
+                        <td className="px-4 py-2">
+                          {o.tracking ? (
+                            o.tracking_url ? (
+                              <a
+                                href={o.tracking_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={o.carrier ?? "Rastreio"}
+                                className="inline-flex items-center gap-1 text-primary hover:underline"
+                              >
+                                <Truck className="w-3 h-3" /> {o.tracking}
+                              </a>
+                            ) : (
+                              <span
+                                title={o.carrier ?? "Rastreio"}
+                                className="inline-flex items-center gap-1 text-foreground"
+                              >
+                                <Truck className="w-3 h-3 text-muted-foreground" /> {o.tracking}
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-2 text-muted-foreground">
                           {new Date(o.created_at).toLocaleDateString("pt-BR")}

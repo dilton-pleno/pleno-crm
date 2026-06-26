@@ -127,12 +127,19 @@ export async function upsertWbuyOrder(order: WbuyOrder): Promise<void> {
   const createdAt = parseOrderDate(order.data);
   const externalId = String(order.id);
 
+  const tracking = order.frete?.rastreio?.trim() || null;
+  const carrier = order.frete?.nome?.trim() || null;
+  const trackingUrl = order.frete?.rastreio_url?.trim() || null;
+
   const data = {
     contactId,
     platform: "wbuy",
     status,
     total,
     items: items as unknown as Prisma.InputJsonValue,
+    tracking,
+    carrier,
+    trackingUrl,
     syncedAt: new Date(),
   };
 

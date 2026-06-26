@@ -91,7 +91,7 @@ export interface WbuyOrder {
   data?: string; // "AAAA-MM-DD HH:MM:SS"
   status?: { id?: string; nome?: string };
   valor_total?: { subtotal?: string; desconto?: string; total?: string };
-  frete?: { rastreio?: string; nome?: string; valor?: string; prazo?: string };
+  frete?: { rastreio?: string; rastreio_url?: string; nome?: string; valor?: string; prazo?: string };
   cliente?: {
     id?: string;
     nome?: string;
