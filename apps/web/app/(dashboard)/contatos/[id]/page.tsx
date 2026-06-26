@@ -3,7 +3,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { getAccessLevel } from "@/lib/permissions";
-import { MessageCircle, Hash, ArrowLeft } from "lucide-react";
+import { MessageCircle, ArrowLeft } from "lucide-react";
+import { ChannelIcon } from "@/components/ui/channel-badge";
 import { ContactEditCard } from "./contact-edit";
 import { ContactWbuyData } from "./contact-wbuy-data";
 import { OrderHistory } from "@/components/inbox/order-history";
@@ -168,7 +169,7 @@ export default async function ContatoPage({ params }: Props) {
             <div className="flex flex-col gap-2">
               {contact.channels.map((ch) => (
                 <div key={ch.id} className="flex items-center gap-2 text-sm">
-                  <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+                  <ChannelIcon type={ch.channelType} size={15} />
                   <span className="text-muted-foreground text-xs">
                     {CHANNEL_LABELS[ch.channelType] ?? ch.channelType}
                   </span>

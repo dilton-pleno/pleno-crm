@@ -41,12 +41,18 @@ interface ContactDetail {
   channels: Array<{ id: string; channelType: string; channelIdentifier: string }>;
 }
 
+interface Agent {
+  id: string;
+  name: string;
+}
+
 interface Props {
   currentUserId: string;
   currentUserRole: Role;
+  agents: Agent[];
 }
 
-export function InboxClient({ currentUserId, currentUserRole }: Props) {
+export function InboxClient({ currentUserId, currentUserRole, agents }: Props) {
   const canLink = getAccessLevel(currentUserRole, "contatos") === "full";
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -152,15 +158,20 @@ export function InboxClient({ currentUserId, currentUserRole }: Props) {
     [selectedId, fetchConversations]
   );
 
-  const assignMe = useCallback(async () => {
-    if (!selectedId) return;
-    await fetch(`/api/v1/conversations/${selectedId}/assign`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: currentUserId }),
-    });
-    void fetchConversations();
-  }, [selectedId, currentUserId, fetchConversations]);
+  const assignTo = useCallback(
+    async (userId: string | null) => {
+      if (!selectedId) return;
+      await fetch(`/api/v1/conversations/${selectedId}/assign`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      void fetchConversations();
+    },
+    [selectedId, fetchConversations]
+  );
+
+  const assignMe = useCallback(() => void assignTo(currentUserId), [assignTo, currentUserId]);
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -236,13 +247,16 @@ export function InboxClient({ currentUserId, currentUserRole }: Props) {
         }
         onResolve={() => void updateStatus("resolved")}
         onPending={() => void updateStatus("pending")}
-        onAssignMe={() => void assignMe()}
+        onAssignMe={assignMe}
+        onAssign={(userId) => void assignTo(userId)}
         onLinked={() => {
           void fetchConversations();
           if (selectedId) void fetchContact(selectedId, conversations);
         }}
         canLink={canLink}
         currentUserId={currentUserId}
+        currentUserRole={currentUserRole}
+        agents={agents}
       />
     </div>
   );

@@ -13,5 +13,12 @@ export default async function KanbanPage() {
     orderBy: { name: "asc" },
   });
 
-  return <KanbanBoard pipelineId="default-pipeline" agents={agents} />;
+  return (
+    <KanbanBoard
+      pipelineId="default-pipeline"
+      agents={agents}
+      currentUserId={session.user.id}
+      currentUserRole={session.user.role}
+    />
+  );
 }

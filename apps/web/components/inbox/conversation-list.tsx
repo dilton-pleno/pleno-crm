@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import Link from "next/link";
-import { Search, MessageCircle } from "lucide-react";
+import { Search, MessageCircle, Clock } from "lucide-react";
+import { ChannelBadge, ChannelIcon } from "@/components/ui/channel-badge";
+import { getChannelMeta, FILTERABLE_CHANNELS } from "@/lib/channels";
 
 type FilterTab = "all" | "mine" | "unassigned";
 
@@ -16,14 +17,6 @@ interface ConversationItem {
   assigned_to: { id: string; name: string } | null;
 }
 
-const CHANNEL_ICONS: Record<string, string> = {
-  whatsapp: "WA",
-  instagram: "IG",
-  messenger: "ME",
-  email: "EM",
-  site: "SI",
-};
-
 function formatTime(iso: string): string {
   const date = new Date(iso);
   const now = new Date();
@@ -36,6 +29,24 @@ function formatTime(iso: string): string {
   return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 
+// SLA de primeira resposta: conversa aberta cuja última mensagem é do cliente.
+const SLA_WARN_MIN = 60; // 1h
+const SLA_CRIT_MIN = 180; // 3h
+
+function slaWaitingMinutes(conv: ConversationItem): number | null {
+  if (conv.status !== "open") return null;
+  if (!conv.last_message || conv.last_message.direction !== "in") return null;
+  const mins = Math.floor((Date.now() - new Date(conv.last_message.sent_at).getTime()) / 60000);
+  return mins;
+}
+
+function formatWaiting(mins: number): string {
+  if (mins < 60) return `${mins}min`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+}
+
 interface Props {
   conversations: ConversationItem[];
   selectedId: string | null;
@@ -45,9 +56,13 @@ interface Props {
 
 export function ConversationList({ conversations, selectedId, onSelect, currentUserId }: Props) {
   const [tab, setTab] = useState<FilterTab>("all");
+  const [channelFilter, setChannelFilter] = useState<string | null>(null);
+  const [waitingOnly, setWaitingOnly] = useState(false);
   const [search, setSearch] = useState("");
 
   const filtered = conversations.filter((c) => {
+    if (channelFilter && c.channel_type !== channelFilter) return false;
+    if (waitingOnly && (slaWaitingMinutes(c) ?? 0) < SLA_WARN_MIN) return false;
     if (tab === "mine" && c.assigned_to?.id !== currentUserId) return false;
     if (tab === "unassigned" && c.assigned_to !== null) return false;
     if (search) {
@@ -82,6 +97,37 @@ export function ConversationList({ conversations, selectedId, onSelect, currentU
           />
         </div>
 
+        {/* Filtro por canal */}
+        <div className="flex items-center gap-1 mt-2">
+          <button
+            onClick={() => setChannelFilter(null)}
+            className={`px-2 py-1 text-xs rounded-md transition-colors ${
+              channelFilter === null
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent"
+            }`}
+          >
+            Todos
+          </button>
+          {FILTERABLE_CHANNELS.map((ch) => {
+            const active = channelFilter === ch;
+            const meta = getChannelMeta(ch);
+            return (
+              <button
+                key={ch}
+                onClick={() => setChannelFilter(active ? null : ch)}
+                title={meta.label}
+                className={`flex items-center justify-center w-7 h-7 rounded-md transition-colors ${
+                  active ? "ring-2 ring-offset-1 ring-offset-card" : "hover:bg-accent opacity-70 hover:opacity-100"
+                }`}
+                style={active ? { backgroundColor: `${meta.color}1a`, boxShadow: `0 0 0 2px ${meta.color}` } : undefined}
+              >
+                <ChannelIcon type={ch} size={15} />
+              </button>
+            );
+          })}
+        </div>
+
         {/* Filtros */}
         <div className="flex gap-1 mt-2">
           {(["all", "mine", "unassigned"] as FilterTab[]).map((t) => (
@@ -98,6 +144,18 @@ export function ConversationList({ conversations, selectedId, onSelect, currentU
             </button>
           ))}
         </div>
+
+        {/* SLA: aguardando resposta */}
+        <button
+          onClick={() => setWaitingOnly((v) => !v)}
+          className={`mt-1.5 w-full flex items-center justify-center gap-1 py-1 text-xs rounded-md transition-colors ${
+            waitingOnly
+              ? "bg-orange-500/15 text-orange-600"
+              : "text-muted-foreground hover:bg-accent"
+          }`}
+        >
+          <Clock className="w-3 h-3" /> Aguardando resposta
+        </button>
       </div>
 
       {/* Lista */}
@@ -109,7 +167,9 @@ export function ConversationList({ conversations, selectedId, onSelect, currentU
           </div>
         )}
 
-        {filtered.map((conv) => (
+        {filtered.map((conv) => {
+          const waiting = slaWaitingMinutes(conv);
+          return (
           <button
             key={conv.id}
             onClick={() => onSelect(conv.id)}
@@ -123,18 +183,31 @@ export function ConversationList({ conversations, selectedId, onSelect, currentU
                 <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-semibold">
                   {conv.contact.name.charAt(0).toUpperCase()}
                 </div>
-                <span className="absolute -bottom-0.5 -right-0.5 text-[9px] bg-green-500 text-white rounded px-0.5 leading-none py-0.5">
-                  {CHANNEL_ICONS[conv.channel_type] ?? "??"}
-                </span>
+                <ChannelBadge
+                  type={conv.channel_type}
+                  className="absolute -bottom-0.5 -right-0.5"
+                />
               </div>
 
               {/* Conteúdo */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-1">
                   <span className="text-xs font-medium text-foreground truncate">{conv.contact.name}</span>
-                  <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                    {conv.last_message ? formatTime(conv.last_message.sent_at) : ""}
-                  </span>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {waiting !== null && waiting >= SLA_WARN_MIN && (
+                      <span
+                        className={`flex items-center gap-0.5 text-[9px] font-medium ${
+                          waiting >= SLA_CRIT_MIN ? "text-red-600" : "text-orange-600"
+                        }`}
+                        title={`Aguardando resposta há ${formatWaiting(waiting)}`}
+                      >
+                        <Clock className="w-2.5 h-2.5" /> {formatWaiting(waiting)}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">
+                      {conv.last_message ? formatTime(conv.last_message.sent_at) : ""}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between gap-1 mt-0.5">
                   <p className="text-xs text-muted-foreground truncate">
@@ -152,7 +225,8 @@ export function ConversationList({ conversations, selectedId, onSelect, currentU
               </div>
             </div>
           </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
