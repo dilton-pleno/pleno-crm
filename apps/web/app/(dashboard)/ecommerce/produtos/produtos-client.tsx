@@ -148,56 +148,78 @@ export function ProdutosClient() {
               : "Nenhum produto sincronizado. Use “Sincronizar produtos” em Configurações → Integrações."}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border text-muted-foreground">
-                  <th className="text-left font-medium px-4 py-2">Produto</th>
-                  <th className="text-left font-medium px-3 py-2">Marca</th>
-                  <th className="text-right font-medium px-3 py-2">Preço</th>
-                  <th className="text-right font-medium px-3 py-2">Estoque</th>
-                  <th className="text-right font-medium px-3 py-2">Vendidos</th>
-                  <th className="text-right font-medium px-3 py-2">Faturamento</th>
-                  <th className="text-right font-medium px-3 py-2">Views</th>
-                  <th className="text-center font-medium px-3 py-2">SEO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((p) => (
-                  <tr key={p.id} className="border-b border-border last:border-0 hover:bg-accent/40">
-                    <td className="px-4 py-2">
-                      <p className="text-foreground truncate max-w-[280px]">{p.name}</p>
-                      {p.cod && <p className="text-[10px] text-muted-foreground">#{p.cod}</p>}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">{p.brand ?? "—"}</td>
-                    <td className="px-3 py-2 text-right text-foreground">{fmtCurrency(p.price)}</td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">{fmtNumber(p.stock)}</td>
-                    <td className="px-3 py-2 text-right text-foreground font-medium">{fmtNumber(p.units_sold)}</td>
-                    <td className="px-3 py-2 text-right text-foreground">{fmtCurrency(p.revenue)}</td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">
-                      <span className="inline-flex items-center gap-1 justify-end">
-                        <Eye className="w-3 h-3" /> {fmtNumber(p.views)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {p.has_description && p.has_gtin ? (
-                        <span className="text-[10px] text-green-600">OK</span>
-                      ) : (
-                        <span
-                          className="inline-flex items-center gap-1 text-[10px] text-yellow-600"
-                          title={`${!p.has_description ? "Sem descrição. " : ""}${!p.has_gtin ? "Sem GTIN." : ""}`}
-                        >
-                          <AlertTriangle className="w-3 h-3" />
-                          {!p.has_description ? "desc" : "gtin"}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 p-3">
+            {products.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function SeoBadge({ product }: { product: Product }) {
+  if (product.has_description && product.has_gtin) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-green-600">
+        SEO OK
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] text-yellow-600"
+      title={`${!product.has_description ? "Sem descrição. " : ""}${!product.has_gtin ? "Sem GTIN." : ""}`}
+    >
+      <AlertTriangle className="w-3 h-3" />
+      {!product.has_description ? "sem descrição" : "sem GTIN"}
+    </span>
+  );
+}
+
+function ProductCard({ product: p }: { product: Product }) {
+  return (
+    <div className="bg-card border border-border rounded-lg p-3 flex flex-col gap-2 hover:border-primary/40 transition-colors">
+      {/* Topo: nome + código + marca */}
+      <div className="flex flex-col gap-0.5 min-h-[44px]">
+        <p className="text-xs font-medium text-foreground line-clamp-2 leading-snug" title={p.name}>
+          {p.name}
+        </p>
+        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          {p.cod && <span>#{p.cod}</span>}
+          {p.cod && p.brand && <span>·</span>}
+          {p.brand && <span className="truncate">{p.brand}</span>}
+        </div>
+      </div>
+
+      {/* Preço em destaque */}
+      <p className="text-base font-semibold text-foreground">{fmtCurrency(p.price)}</p>
+
+      {/* Rodapé: estatísticas */}
+      <div className="mt-auto pt-2 border-t border-border grid grid-cols-2 gap-y-1.5 gap-x-2 text-[11px]">
+        <div className="flex flex-col">
+          <span className="text-muted-foreground">Vendidos</span>
+          <span className="text-foreground font-medium">{fmtNumber(p.units_sold)}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-muted-foreground">Faturamento</span>
+          <span className="text-foreground font-medium">{fmtCurrency(p.revenue)}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-muted-foreground">Estoque</span>
+          <span className="text-foreground">{fmtNumber(p.stock)}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-muted-foreground">Views</span>
+          <span className="text-foreground inline-flex items-center gap-1">
+            <Eye className="w-3 h-3" /> {fmtNumber(p.views)}
+          </span>
+        </div>
+      </div>
+
+      <div className="pt-1">
+        <SeoBadge product={p} />
       </div>
     </div>
   );
