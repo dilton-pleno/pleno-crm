@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { canAccess } from "@/lib/permissions";
 import type { Role, Module } from "@pleno-crm/types";
 import {
@@ -39,10 +42,13 @@ const NAV_ITEMS: NavItem[] = [
 
 interface SidebarProps {
   role: Role;
-  currentPath: string;
 }
 
-export function Sidebar({ role, currentPath }: SidebarProps) {
+export function Sidebar({ role }: SidebarProps) {
+  // usePathname atualiza a cada navegação client-side; o layout (server) persiste
+  // entre rotas e não acompanharia a URL, por isso a decisão de item ativo é aqui.
+  const currentPath = usePathname();
+
   const visibleItems = NAV_ITEMS.filter(
     (item) => canAccess(role, item.module) && (!item.roles || item.roles.includes(role))
   );

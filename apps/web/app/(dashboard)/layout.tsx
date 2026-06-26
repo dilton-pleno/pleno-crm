@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
@@ -16,12 +15,9 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const headersList = await headers();
-  const pathname = headersList.get("x-pathname") ?? "/atendimento";
-
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar role={session.user.role as Role} currentPath={pathname} />
+      <Sidebar role={session.user.role as Role} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header
           userName={session.user.name}
