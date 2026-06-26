@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ShoppingCart, CheckCircle2, AlertCircle, Plug, Trash2, RefreshCw } from "lucide-react";
+import { ShoppingCart, CheckCircle2, AlertCircle, Plug, Trash2, RefreshCw, Users } from "lucide-react";
 
 interface ImportStatus {
   status: "running" | "done" | "error";
@@ -195,6 +195,22 @@ export function WbuyCard() {
     }
   }, []);
 
+  const syncCustomers = useCallback(async () => {
+    setWorking(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/v1/integrations/wbuy/sync-customers", { method: "POST" });
+      const json = await res.json();
+      setMessage(
+        res.ok
+          ? { kind: "ok", text: `Clientes: ${json.data.enriched} contatos enriquecidos (${json.data.scanned} verificados)` }
+          : { kind: "err", text: json.error?.message ?? "Falha ao sincronizar clientes" }
+      );
+    } finally {
+      setWorking(false);
+    }
+  }, []);
+
   const loadWebhooks = useCallback(async () => {
     const res = await fetch("/api/v1/integrations/wbuy/webhooks");
     if (res.ok) {
@@ -321,6 +337,13 @@ export function WbuyCard() {
                 className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
               >
                 <ShoppingCart className="w-3.5 h-3.5" /> Sincronizar pedidos
+              </button>
+              <button
+                onClick={() => void syncCustomers()}
+                disabled={working}
+                className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
+              >
+                <Users className="w-3.5 h-3.5" /> Sincronizar clientes
               </button>
               <button
                 onClick={() => void importHistory()}

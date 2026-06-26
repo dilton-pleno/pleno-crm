@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { WbuyOrder, WbuyAbandonedCart } from "@/lib/wbuy";
+import type { WbuyOrder, WbuyAbandonedCart, WbuyCustomerRaw } from "@/lib/wbuy";
 import { upsertWbuyOrder, updateWbuyOrderStatus, upsertAbandonedCart } from "@/lib/wbuy-order";
+import { enrichContactFromCustomer } from "@/lib/wbuy-customer";
 
 interface WbuyWebhookPayload {
   lid?: string;
@@ -43,8 +44,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
       } else if (payload.type === "abandoned_cart" && payload.data) {
         await upsertAbandonedCart(payload.data as WbuyAbandonedCart);
+      } else if (payload.type === "customer" && payload.data) {
+        // Enriquece um contato existente (não cria contato sem interação).
+        await enrichContactFromCustomer(payload.data as WbuyCustomerRaw);
       }
-      // customer / product: ignorados nesta fase.
+      // product: ignorado (produtos têm sync próprio).
     } catch (err) {
       console.error("[webhook/wbuy] Erro ao processar evento:", err);
     }
