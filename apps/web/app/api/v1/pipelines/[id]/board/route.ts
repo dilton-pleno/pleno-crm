@@ -17,6 +17,7 @@ export async function GET(
 
   const agentId = searchParams.get("agent_id");
   const channelParam = searchParams.get("channel");
+  const tagId = searchParams.get("tag");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
 
@@ -30,6 +31,9 @@ export async function GET(
   const cardWhere: Prisma.PipelineCardWhereInput = {};
   if (Object.keys(conversationFilter).length > 0) {
     cardWhere.conversation = conversationFilter;
+  }
+  if (tagId) {
+    cardWhere.contact = { tags: { some: { id: tagId } } };
   }
   if (from || to) {
     cardWhere.createdAt = {
@@ -65,6 +69,7 @@ export async function GET(
                   name: true,
                   avatarUrl: true,
                   phone: true,
+                  tags: { select: { id: true, name: true, color: true }, orderBy: { name: "asc" } },
                   orders: {
                     orderBy: { createdAt: "desc" },
                     take: 1,
@@ -113,6 +118,7 @@ export async function GET(
           name: card.contact.name,
           avatar_url: card.contact.avatarUrl,
           phone: card.contact.phone,
+          tags: card.contact.tags,
         },
         channel_type: card.conversation.channel.channelType,
         last_message_preview: lastMsg?.content ?? null,

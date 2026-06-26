@@ -32,6 +32,7 @@ export async function GET(
     where: { id },
     include: {
       channels: { select: { id: true, channelType: true, channelIdentifier: true } },
+      tags: { select: { id: true, name: true, color: true }, orderBy: { name: "asc" } },
     },
   });
 
@@ -51,6 +52,7 @@ export async function GET(
       avatarUrl: contact.avatarUrl,
       notes: contact.notes,
       channels: contact.channels,
+      tags: contact.tags,
     },
   });
 }

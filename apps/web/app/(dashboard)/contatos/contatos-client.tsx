@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Search, Users } from "lucide-react";
 import { ChannelBadge } from "@/components/ui/channel-badge";
+import { TagChip, type TagData } from "@/components/ui/tag-chip";
 
 interface ContactItem {
   id: string;
@@ -14,6 +15,7 @@ interface ContactItem {
   city: string | null;
   uf: string | null;
   channels: Array<{ id: string; channel_type: string }>;
+  tags: TagData[];
   last_interaction_at: string | null;
 }
 
@@ -130,6 +132,14 @@ export function ContatosClient() {
                   </p>
                 </div>
               </div>
+
+              {c.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {c.tags.map((t) => (
+                    <TagChip key={t.id} tag={t} size="xs" />
+                  ))}
+                </div>
+              )}
 
               <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                 <span className="truncate">

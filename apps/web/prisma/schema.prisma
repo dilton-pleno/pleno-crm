@@ -176,8 +176,20 @@ model Contact {
   conversations Conversation[]
   cards         PipelineCard[]
   orders        Order[]
+  tags          Tag[]
 
   @@map("contacts")
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("#6366f1")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  contacts Contact[]
+
+  @@map("tags")
 }
 
 model ContactChannel {

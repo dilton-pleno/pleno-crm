@@ -31,6 +31,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       orderBy: { updatedAt: "desc" },
       include: {
         channels: { select: { id: true, channelType: true } },
+        tags: { select: { id: true, name: true, color: true }, orderBy: { name: "asc" } },
         conversations: {
           orderBy: { updatedAt: "desc" },
           take: 1,
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     city: c.city,
     uf: c.uf,
     channels: c.channels.map((ch) => ({ id: ch.id, channel_type: ch.channelType })),
+    tags: c.tags,
     last_interaction_at: c.conversations[0]?.updatedAt.toISOString() ?? null,
   }));
 
