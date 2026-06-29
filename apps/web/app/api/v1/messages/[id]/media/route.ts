@@ -49,15 +49,18 @@ export async function GET(
     (message.mediaType ? FALLBACK_MIME[message.mediaType] : undefined) ??
     "application/octet-stream";
 
-  // Documentos são entregues inline com nome de arquivo; demais mídias inline
-  // para renderizar direto em <img>/<audio>/<video>.
+  // Anti-XSS de conteúdo: mídia de imagem/áudio/vídeo "padrão" é servida inline
+  // para renderizar em <img>/<audio>/<video>; qualquer coisa perigosa
+  // (documento, SVG, HTML) vai como download (attachment) e com nosniff, para
+  // o navegador não interpretar/executar conteúdo na origem do CRM.
+  const dangerous = message.mediaType === "document" || /svg|html|xml/i.test(mime);
+  const safeName = (message.mediaFileName ?? "arquivo").replace(/[\r\n"\\]/g, "_");
   const headers: Record<string, string> = {
     "Content-Type": mime,
     "Cache-Control": "private, max-age=86400",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Disposition": `${dangerous ? "attachment" : "inline"}; filename="${safeName}"`,
   };
-  if (message.mediaType === "document" && message.mediaFileName) {
-    headers["Content-Disposition"] = `inline; filename="${message.mediaFileName}"`;
-  }
 
   return new NextResponse(new Uint8Array(message.mediaData), { headers });
 }
