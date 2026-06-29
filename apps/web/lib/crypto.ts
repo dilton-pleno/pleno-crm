@@ -1,4 +1,12 @@
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from "crypto";
+import { createCipheriv, createDecipheriv, randomBytes, createHash, timingSafeEqual } from "crypto";
+
+/** Comparação de strings em tempo constante (segredos/tokens de webhook). */
+export function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
 
 // Criptografia simétrica para segredos guardados no banco (ex.: senha da API
 // Wbuy). Usa AES-256-GCM. A chave vem de ENCRYPTION_KEY; derivamos 32 bytes

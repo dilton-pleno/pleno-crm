@@ -3,6 +3,7 @@ import type { WbuyOrder, WbuyAbandonedCart, WbuyCustomerRaw } from "@/lib/wbuy";
 import { upsertWbuyOrder, updateWbuyOrderStatus, upsertAbandonedCart } from "@/lib/wbuy-order";
 import { enrichContactFromCustomer } from "@/lib/wbuy-customer";
 import { runAbandonedCartRecovery } from "@/lib/cart-recovery";
+import { safeEqual } from "@/lib/crypto";
 
 interface WbuyWebhookPayload {
   lid?: string;
@@ -21,7 +22,8 @@ interface OrderStatusData {
 // retornam 200/201) e processa de forma assíncrona.
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const secret = request.nextUrl.searchParams.get("secret");
-  if (!secret || secret !== process.env.INTERNAL_API_SECRET) {
+  const expected = process.env.INTERNAL_API_SECRET;
+  if (!expected || !secret || !safeEqual(secret, expected)) {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Secret inválido" } },
       { status: 401 }

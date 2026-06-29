@@ -2,6 +2,7 @@ import type { Automation, AutomationAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendOutboundMessage } from "@/lib/outbound";
 import { userSeesInbox } from "@/lib/visibility";
+import { assertSafeWebhookUrl } from "@/lib/url-guard";
 import { emitEvent } from "@/lib/websocket";
 
 export type AutomationTrigger =
@@ -141,6 +142,7 @@ async function executeAction(action: AutomationAction, ctx: TriggerContext): Pro
     case "webhook": {
       const url = typeof cfg.url === "string" ? cfg.url.trim() : "";
       if (!url) return;
+      await assertSafeWebhookUrl(url); // anti-SSRF (bloqueia destinos internos)
       const method = (typeof cfg.method === "string" ? cfg.method : "POST").toUpperCase();
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 8000);

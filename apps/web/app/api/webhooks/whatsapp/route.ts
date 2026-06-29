@@ -4,6 +4,7 @@ import { ingestInboundMessage } from "@/lib/inbound-message";
 import { getBase64FromMediaMessage } from "@/lib/evolution";
 import { handleConnectionUpdate } from "@/lib/whatsapp-connection";
 import { resolveInboxByWhatsappInstance } from "@/lib/inbox-routing";
+import { safeEqual } from "@/lib/crypto";
 
 type WhatsAppEvent = "messages.upsert" | "messages.update" | "connection.update";
 
@@ -184,7 +185,8 @@ async function handleMessageUpdate(data: MessageUpdateData): Promise<void> {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const secret = request.headers.get("x-webhook-secret");
-  if (secret !== process.env.INTERNAL_API_SECRET) {
+  const expected = process.env.INTERNAL_API_SECRET;
+  if (!expected || !secret || !safeEqual(secret, expected)) {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Invalid webhook secret" } },
       { status: 401 }
