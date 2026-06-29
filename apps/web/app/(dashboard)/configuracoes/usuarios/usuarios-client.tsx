@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { UserPlus, Pencil, KeyRound, X, Copy, Check } from "lucide-react";
+import { UserPlus, Pencil, KeyRound, X, Copy, Check, Sparkles } from "lucide-react";
+import { generatePassword, passwordChecks, isPasswordValid } from "@/lib/password";
 
 type Role = "ADMIN" | "GESTOR" | "ATENDENTE";
 
@@ -296,13 +297,38 @@ function UserFormModal({
           className="text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
         />
         {mode === "create" && (
-          <input
-            type="text"
-            value={form.password}
-            onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-            placeholder="Senha (mín. 8 caracteres)"
-            className="text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
-          />
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={form.password}
+                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                placeholder="Senha"
+                className="flex-1 text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, password: generatePassword(14) }))}
+                className="flex items-center gap-1 text-xs bg-card border border-border rounded-md px-2.5 py-2 hover:bg-accent whitespace-nowrap"
+                title="Gerar senha forte"
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Gerar
+              </button>
+            </div>
+            {form.password.length > 0 && (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                {passwordChecks(form.password).map((c) => (
+                  <span
+                    key={c.key}
+                    className={`text-[10px] flex items-center gap-1 ${c.ok ? "text-green-600" : "text-muted-foreground"}`}
+                  >
+                    {c.ok ? <Check className="w-2.5 h-2.5" /> : <X className="w-2.5 h-2.5" />}
+                    {c.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         <label className="text-xs text-muted-foreground flex flex-col gap-1">
@@ -349,7 +375,7 @@ function UserFormModal({
               saving ||
               !form.name.trim() ||
               !form.email.trim() ||
-              (mode === "create" && form.password.length < 8)
+              (mode === "create" && !isPasswordValid(form.password))
             }
             className="text-xs bg-primary text-primary-foreground rounded-md px-3 py-1.5 hover:opacity-90 disabled:opacity-40"
           >

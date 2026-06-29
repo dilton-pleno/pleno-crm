@@ -4,11 +4,14 @@ import { hash } from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { isPasswordValid } from "@/lib/password";
 
 const createSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(8, "A senha deve ter ao menos 8 caracteres"),
+  password: z
+    .string()
+    .refine(isPasswordValid, "A senha deve ter 8+ caracteres com maiúscula, minúscula, número e símbolo"),
   role: z.enum(["ADMIN", "GESTOR", "ATENDENTE"]),
   active: z.boolean().optional().default(true),
 });
