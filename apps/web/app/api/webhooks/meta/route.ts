@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature, getUserProfile } from "@/lib/meta";
+import { getMetaConfig } from "@/lib/meta-config";
 import { ingestInboundMessage } from "@/lib/inbound-message";
 import { upsertPostComment } from "@/lib/post-comment";
 import { linkInstagramHandle } from "@/lib/instagram-link";
@@ -133,7 +134,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token === process.env.META_WEBHOOK_VERIFY_TOKEN) {
+  const { verifyToken } = await getMetaConfig();
+  if (mode === "subscribe" && verifyToken && token === verifyToken) {
     return new NextResponse(challenge ?? "", { status: 200 });
   }
 
@@ -152,7 +154,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const rawBody = await request.text();
   const signature = request.headers.get("x-hub-signature-256");
 
-  if (!verifyWebhookSignature(rawBody, signature)) {
+  if (!(await verifyWebhookSignature(rawBody, signature))) {
     return NextResponse.json(
       { error: { code: "UNAUTHORIZED", message: "Assinatura inválida" } },
       { status: 401 }

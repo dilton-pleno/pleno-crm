@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import { getMetaConfig } from "@/lib/meta-config";
 
 const GRAPH_VERSION = "v21.0";
 
@@ -6,29 +7,29 @@ function graphUrl(path: string): string {
   return `https://graph.facebook.com/${GRAPH_VERSION}/${path.replace(/^\//, "")}`;
 }
 
-function accessToken(): string {
-  const token = process.env.META_ACCESS_TOKEN;
-  if (!token) throw new Error("META_ACCESS_TOKEN não configurada");
-  return token;
+async function requireToken(): Promise<string> {
+  const { accessToken } = await getMetaConfig();
+  if (!accessToken) throw new Error("Access token da Meta não configurado");
+  return accessToken;
 }
 
-function pageId(): string {
-  const id = process.env.META_PAGE_ID;
-  if (!id) throw new Error("META_PAGE_ID não configurada");
-  return id;
+async function requirePageId(): Promise<string> {
+  const { pageId } = await getMetaConfig();
+  if (!pageId) throw new Error("Page ID da Meta não configurado");
+  return pageId;
 }
 
 /**
  * Valida a assinatura HMAC-SHA256 que a Meta envia no header
  * `x-hub-signature-256` (formato "sha256=HASH"), calculada sobre o corpo
- * cru da requisição usando o META_APP_SECRET.
+ * cru da requisição usando o app secret.
  */
-export function verifyWebhookSignature(rawBody: string, signature: string | null): boolean {
-  const secret = process.env.META_APP_SECRET;
-  if (!secret) throw new Error("META_APP_SECRET não configurada");
+export async function verifyWebhookSignature(rawBody: string, signature: string | null): Promise<boolean> {
+  const { appSecret } = await getMetaConfig();
+  if (!appSecret) throw new Error("App secret da Meta não configurado");
   if (!signature) return false;
 
-  const expected = "sha256=" + createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
+  const expected = "sha256=" + createHmac("sha256", appSecret).update(rawBody, "utf8").digest("hex");
   const a = Buffer.from(signature);
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;
@@ -47,8 +48,9 @@ interface GraphProfile {
  */
 export async function getUserProfile(psid: string): Promise<GraphProfile | null> {
   try {
+    const token = await requireToken();
     const res = await fetch(
-      `${graphUrl(psid)}?fields=name,username,profile_pic&access_token=${accessToken()}`
+      `${graphUrl(psid)}?fields=name,username,profile_pic&access_token=${token}`
     );
     if (!res.ok) return null;
     return (await res.json()) as GraphProfile;
@@ -64,7 +66,8 @@ interface SendResponse {
 }
 
 async function sendViaGraph(recipientId: string, text: string): Promise<SendResponse> {
-  const res = await fetch(`${graphUrl(`${pageId()}/messages`)}?access_token=${accessToken()}`, {
+  const [token, page] = [await requireToken(), await requirePageId()];
+  const res = await fetch(`${graphUrl(`${page}/messages`)}?access_token=${token}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -98,7 +101,8 @@ export function sendMessengerMessage(recipientId: string, text: string): Promise
  * mensagem para a DM quando o recipient é `comment_id`.
  */
 export async function sendPrivateReply(commentId: string, text: string): Promise<SendResponse> {
-  const res = await fetch(`${graphUrl(`${pageId()}/messages`)}?access_token=${accessToken()}`, {
+  const [token, page] = [await requireToken(), await requirePageId()];
+  const res = await fetch(`${graphUrl(`${page}/messages`)}?access_token=${token}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -122,7 +126,8 @@ interface ReplyResponse {
 
 /** Responde um comentário de post via Graph API. */
 export async function replyToComment(commentId: string, message: string): Promise<ReplyResponse> {
-  const res = await fetch(`${graphUrl(`${commentId}/replies`)}?access_token=${accessToken()}`, {
+  const token = await requireToken();
+  const res = await fetch(`${graphUrl(`${commentId}/replies`)}?access_token=${token}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message }),
@@ -146,8 +151,9 @@ export interface GraphPost {
 
 /** Lista posts recentes da conta IG vinculada (Module 2.4). */
 export async function getRecentPosts(igUserId: string, limit = 20): Promise<GraphPost[]> {
+  const token = await requireToken();
   const res = await fetch(
-    `${graphUrl(`${igUserId}/media`)}?fields=id,media_url,caption,timestamp,comments_count&limit=${limit}&access_token=${accessToken()}`
+    `${graphUrl(`${igUserId}/media`)}?fields=id,media_url,caption,timestamp,comments_count&limit=${limit}&access_token=${token}`
   );
   if (!res.ok) {
     const body = await res.text();
@@ -160,8 +166,9 @@ export async function getRecentPosts(igUserId: string, limit = 20): Promise<Grap
 /** Busca caption/mídia de um post específico (usado ao registrar comentários). */
 export async function getPostById(postId: string): Promise<GraphPost | null> {
   try {
+    const token = await requireToken();
     const res = await fetch(
-      `${graphUrl(postId)}?fields=id,media_url,caption,timestamp,comments_count&access_token=${accessToken()}`
+      `${graphUrl(postId)}?fields=id,media_url,caption,timestamp,comments_count&access_token=${token}`
     );
     if (!res.ok) return null;
     return (await res.json()) as GraphPost;
@@ -180,8 +187,9 @@ export interface GraphComment {
 
 /** Lista comentários de um post (Module 2.4). */
 export async function getPostComments(postId: string): Promise<GraphComment[]> {
+  const token = await requireToken();
   const res = await fetch(
-    `${graphUrl(`${postId}/comments`)}?fields=id,username,text,timestamp,from&access_token=${accessToken()}`
+    `${graphUrl(`${postId}/comments`)}?fields=id,username,text,timestamp,from&access_token=${token}`
   );
   if (!res.ok) {
     const body = await res.text();
@@ -189,4 +197,16 @@ export async function getPostComments(postId: string): Promise<GraphComment[]> {
   }
   const json = (await res.json()) as { data?: GraphComment[] };
   return json.data ?? [];
+}
+
+/** Testa a conexão Meta: busca o nome da página. Lança erro se falhar. */
+export async function testMetaConnection(): Promise<{ pageName: string }> {
+  const [token, page] = [await requireToken(), await requirePageId()];
+  const res = await fetch(`${graphUrl(page)}?fields=name&access_token=${token}`);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Meta teste falhou [${res.status}]: ${body}`);
+  }
+  const json = (await res.json()) as { name?: string };
+  return { pageName: json.name ?? "(sem nome)" };
 }
