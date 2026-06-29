@@ -52,9 +52,11 @@ interface Props {
   currentUserId: string;
   currentUserRole: Role;
   agents: Agent[];
+  /** Filtra a lista pelo Canal; ausente = todos os canais. */
+  inboxId?: string | null;
 }
 
-export function InboxClient({ currentUserId, currentUserRole, agents }: Props) {
+export function InboxClient({ currentUserId, currentUserRole, agents, inboxId }: Props) {
   const canLink = getAccessLevel(currentUserRole, "contatos") === "full";
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -65,7 +67,10 @@ export function InboxClient({ currentUserId, currentUserRole, agents }: Props) {
 
   const fetchConversations = useCallback(async () => {
     try {
-      const res = await fetch("/api/v1/conversations?limit=50");
+      const url = inboxId
+        ? `/api/v1/conversations?limit=50&inbox_id=${encodeURIComponent(inboxId)}`
+        : "/api/v1/conversations?limit=50";
+      const res = await fetch(url);
       if (res.ok) {
         const json = (await res.json()) as { data: ConversationItem[] };
         setConversations(json.data);
@@ -73,7 +78,7 @@ export function InboxClient({ currentUserId, currentUserRole, agents }: Props) {
     } finally {
       setLoadingConvs(false);
     }
-  }, []);
+  }, [inboxId]);
 
   const fetchMessages = useCallback(async (convId: string) => {
     setLoadingMsgs(true);

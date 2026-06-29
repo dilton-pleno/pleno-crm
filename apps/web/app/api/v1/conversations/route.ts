@@ -12,12 +12,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const status = searchParams.get("status") as ConversationStatus | null;
   const assignedTo = searchParams.get("assigned_to");
   const search = searchParams.get("search");
+  const inboxId = searchParams.get("inbox_id");
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10)));
   const skip = (page - 1) * limit;
 
   const where = {
     ...(status ? { status } : {}),
+    ...(inboxId ? { inboxId } : {}),
     ...(assignedTo === "me"
       ? { assignedTo: session.user.id }
       : assignedTo === "unassigned"

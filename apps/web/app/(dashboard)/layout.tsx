@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import type { Role } from "@pleno-crm/types";
@@ -15,9 +16,16 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  // Canais ativos para a Caixa de Entrada (na Fase 4 será filtrado por Time).
+  const inboxes = await prisma.inbox.findMany({
+    where: { active: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true },
+  });
+
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar role={session.user.role as Role} />
+      <Sidebar role={session.user.role as Role} inboxes={inboxes} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header
           userName={session.user.name}

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { MessageSquare, Image as ImageIcon, Send, CheckCircle2, Reply } from "lucide-react";
+import { MessageSquare, Image as ImageIcon, Send, CheckCircle2, Reply, Instagram, Facebook } from "lucide-react";
+
+type Platform = "instagram" | "facebook";
 
 interface PostItem {
   id: string;
@@ -33,9 +35,12 @@ function formatDate(iso: string | null): string {
 
 interface Props {
   canReply: boolean;
+  /** Filtra por Canal; ausente = todos os canais (usa config global). */
+  inboxId?: string | null;
 }
 
-export function ComentariosClient({ canReply }: Props) {
+export function ComentariosClient({ canReply, inboxId }: Props) {
+  const [platform, setPlatform] = useState<Platform>("instagram");
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [postsError, setPostsError] = useState<string | null>(null);
@@ -46,15 +51,26 @@ export function ComentariosClient({ canReply }: Props) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [sending, setSending] = useState<string | null>(null);
 
+  // Sufixo de query comum (rede social + Canal).
+  const query = useCallback(
+    (extra?: string) => {
+      const p = new URLSearchParams({ platform });
+      if (inboxId) p.set("inbox_id", inboxId);
+      return `?${p.toString()}${extra ? `&${extra}` : ""}`;
+    },
+    [platform, inboxId]
+  );
+
   const fetchPosts = useCallback(async () => {
     setLoadingPosts(true);
     setPostsError(null);
     try {
-      const res = await fetch("/api/v1/posts");
+      const res = await fetch(`/api/v1/posts${query()}`);
       const json = await res.json();
       if (res.ok) {
         setPosts(json.data as PostItem[]);
       } else {
+        setPosts([]);
         setPostsError(json.error?.message ?? "Falha ao carregar posts");
       }
     } catch {
@@ -62,24 +78,30 @@ export function ComentariosClient({ canReply }: Props) {
     } finally {
       setLoadingPosts(false);
     }
-  }, []);
+  }, [query]);
 
-  const fetchComments = useCallback(async (postId: string) => {
-    setLoadingComments(true);
-    try {
-      const res = await fetch(`/api/v1/posts/${postId}/comments`);
-      if (res.ok) {
-        const json = (await res.json()) as { data: CommentItem[] };
-        setComments(json.data);
-      } else {
-        setComments([]);
+  const fetchComments = useCallback(
+    async (postId: string) => {
+      setLoadingComments(true);
+      try {
+        const res = await fetch(`/api/v1/posts/${postId}/comments${query()}`);
+        if (res.ok) {
+          const json = (await res.json()) as { data: CommentItem[] };
+          setComments(json.data);
+        } else {
+          setComments([]);
+        }
+      } finally {
+        setLoadingComments(false);
       }
-    } finally {
-      setLoadingComments(false);
-    }
-  }, []);
+    },
+    [query]
+  );
 
+  // Recarrega ao trocar de rede/Canal e limpa a seleção atual.
   useEffect(() => {
+    setSelectedPost(null);
+    setComments([]);
     void fetchPosts();
   }, [fetchPosts]);
 
@@ -121,9 +143,29 @@ export function ComentariosClient({ canReply }: Props) {
     <div className="flex h-full overflow-hidden">
       {/* Coluna 1: posts recentes */}
       <div className="flex flex-col border-r border-border bg-card" style={{ width: 320, minWidth: 320 }}>
-        <div className="p-3 border-b border-border">
+        <div className="p-3 border-b border-border flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-foreground">Comentários</h2>
-          <p className="text-xs text-muted-foreground">Posts recentes do Instagram</p>
+          <div className="flex items-center gap-1 bg-muted rounded-md p-0.5">
+            <button
+              onClick={() => setPlatform("instagram")}
+              className={`flex-1 flex items-center justify-center gap-1.5 text-xs rounded px-2 py-1.5 transition-colors ${
+                platform === "instagram" ? "bg-card text-foreground shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Instagram className="w-3.5 h-3.5 text-pink-600" /> Instagram
+            </button>
+            <button
+              onClick={() => setPlatform("facebook")}
+              className={`flex-1 flex items-center justify-center gap-1.5 text-xs rounded px-2 py-1.5 transition-colors ${
+                platform === "facebook" ? "bg-card text-foreground shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Facebook className="w-3.5 h-3.5 text-blue-600" /> Facebook
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Posts recentes do {platform === "instagram" ? "Instagram" : "Facebook"}
+          </p>
         </div>
 
         <div className="flex-1 overflow-y-auto">

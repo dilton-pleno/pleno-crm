@@ -1,23 +1,44 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { getRecentPosts } from "@/lib/meta";
+import { getRecentPosts, getRecentPagePosts } from "@/lib/meta";
+import { getMessagingConfig } from "@/lib/inbox-config";
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   const guard = await requireAccess("atendimento");
   if (!guard.ok) return guard.response;
 
-  const igUserId = process.env.META_IG_USER_ID;
-  if (!igUserId) {
+  const { searchParams } = request.nextUrl;
+  const platform = searchParams.get("platform") === "facebook" ? "facebook" : "instagram";
+  const inboxId = searchParams.get("inbox_id");
+
+  // Credenciais resolvidas do Canal (fallback global). IG usa igId; FB usa pageId.
+  const cfg = await getMessagingConfig(inboxId);
+  const igUserId = cfg.igId || process.env.META_IG_USER_ID || null;
+  const pageId = cfg.pageId || null;
+
+  const target = platform === "facebook" ? pageId : igUserId;
+  if (!target) {
     return NextResponse.json(
-      { error: { code: "CONFIG_ERROR", message: "META_IG_USER_ID não configurada" } },
-      { status: 500 }
+      {
+        error: {
+          code: "NOT_CONFIGURED",
+          message:
+            platform === "facebook"
+              ? "Página do Facebook não configurada neste Canal"
+              : "Conta do Instagram não configurada neste Canal",
+        },
+      },
+      { status: 422 }
     );
   }
 
   let posts;
   try {
-    posts = await getRecentPosts(igUserId);
+    posts =
+      platform === "facebook"
+        ? await getRecentPagePosts(target, inboxId)
+        : await getRecentPosts(target, inboxId);
   } catch (err) {
     console.error("[posts] Erro ao buscar posts na Graph API:", err);
     return NextResponse.json(

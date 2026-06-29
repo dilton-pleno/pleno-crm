@@ -5,17 +5,20 @@ import { getPostComments } from "@/lib/meta";
 import { upsertPostComment } from "@/lib/post-comment";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const guard = await requireAccess("atendimento");
   if (!guard.ok) return guard.response;
 
   const { id: postId } = await params;
+  const { searchParams } = request.nextUrl;
+  const inboxId = searchParams.get("inbox_id");
+  const platform = searchParams.get("platform") === "facebook" ? "facebook" : "instagram";
 
   let comments;
   try {
-    comments = await getPostComments(postId);
+    comments = await getPostComments(postId, inboxId);
   } catch (err) {
     console.error("[posts/comments] Erro ao buscar comentários:", err);
     return NextResponse.json(
@@ -34,6 +37,8 @@ export async function GET(
         authorName: c.username ?? c.from?.username ?? "Desconhecido",
         content: c.text ?? "",
         createdAt: c.timestamp ? new Date(c.timestamp) : undefined,
+        inboxId,
+        platform,
       })
     )
   );

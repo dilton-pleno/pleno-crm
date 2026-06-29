@@ -8,6 +8,10 @@ export interface IncomingComment {
   authorName: string;
   content: string;
   createdAt?: Date;
+  /** Canal (página IG/FB) de origem; null cai no Canal Padrão na ingestão. */
+  inboxId?: string | null;
+  /** Rede social do comentário ("instagram" | "facebook"). */
+  platform?: "instagram" | "facebook" | null;
 }
 
 /**
@@ -24,7 +28,7 @@ export async function upsertPostComment(c: IncomingComment): Promise<void> {
   let postCaption: string | null = existing?.postCaption ?? null;
   let postMediaUrl: string | null = existing?.postMediaUrl ?? null;
   if (!existing) {
-    const post = await getPostById(c.postId);
+    const post = await getPostById(c.postId, c.inboxId);
     postCaption = post?.caption ?? null;
     postMediaUrl = post?.media_url ?? null;
   }
@@ -35,6 +39,9 @@ export async function upsertPostComment(c: IncomingComment): Promise<void> {
       content: c.content,
       authorName: c.authorName,
       authorId: c.authorId,
+      // Preenche metadados de origem se ainda não tínhamos.
+      platform: existing?.platform ?? c.platform ?? undefined,
+      inboxId: existing?.inboxId ?? c.inboxId ?? undefined,
     },
     create: {
       commentId: c.commentId,
@@ -44,6 +51,8 @@ export async function upsertPostComment(c: IncomingComment): Promise<void> {
       authorId: c.authorId,
       authorName: c.authorName,
       content: c.content,
+      platform: c.platform ?? null,
+      inboxId: c.inboxId ?? null,
       createdAt: c.createdAt ?? new Date(),
     },
   });

@@ -114,11 +114,14 @@ async function handleMessaging(object: string, entryId: string, event: MetaMessa
   }
 }
 
-async function handleCommentChange(value: MetaCommentValue): Promise<void> {
+async function handleCommentChange(object: string, entryId: string, value: MetaCommentValue): Promise<void> {
   const commentId = value.id;
   const postId = value.media?.id;
   // Sem id de comentário ou post não há como registrar/responder depois.
   if (!commentId || !postId) return;
+
+  const platform = object === "instagram" ? "instagram" : "facebook";
+  const inboxId = await resolveInboxByMetaId(entryId);
 
   await upsertPostComment({
     commentId,
@@ -126,6 +129,8 @@ async function handleCommentChange(value: MetaCommentValue): Promise<void> {
     authorId: value.from?.id ?? "",
     authorName: value.from?.username ?? "Desconhecido",
     content: value.text ?? "",
+    platform,
+    inboxId,
   });
 }
 
@@ -181,7 +186,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
         for (const change of entry.changes ?? []) {
           if (change.field === "comments") {
-            await handleCommentChange(change.value);
+            await handleCommentChange(payload.object, entry.id, change.value);
           }
           // "mentions" e outros campos: reservados para evoluções futuras.
         }

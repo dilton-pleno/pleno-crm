@@ -152,8 +152,8 @@ export interface GraphPost {
 }
 
 /** Lista posts recentes da conta IG vinculada (Module 2.4). */
-export async function getRecentPosts(igUserId: string, limit = 20): Promise<GraphPost[]> {
-  const token = await requireToken();
+export async function getRecentPosts(igUserId: string, inboxId?: string | null, limit = 20): Promise<GraphPost[]> {
+  const token = await requireToken(inboxId);
   const res = await fetch(
     `${graphUrl(`${igUserId}/media`)}?fields=id,media_url,caption,timestamp,comments_count&limit=${limit}&access_token=${token}`
   );
@@ -165,10 +165,39 @@ export async function getRecentPosts(igUserId: string, limit = 20): Promise<Grap
   return json.data ?? [];
 }
 
+// Formato cru de um post de Página do Facebook (campos diferentes do IG).
+interface RawPagePost {
+  id: string;
+  message?: string;
+  full_picture?: string;
+  created_time?: string;
+  comments?: { summary?: { total_count?: number } };
+}
+
+/** Lista posts recentes de uma Página do Facebook, normalizados como GraphPost. */
+export async function getRecentPagePosts(pageId: string, inboxId?: string | null, limit = 20): Promise<GraphPost[]> {
+  const token = await requireToken(inboxId);
+  const res = await fetch(
+    `${graphUrl(`${pageId}/posts`)}?fields=id,message,full_picture,created_time,comments.summary(true)&limit=${limit}&access_token=${token}`
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Meta getRecentPagePosts falhou [${res.status}]: ${body}`);
+  }
+  const json = (await res.json()) as { data?: RawPagePost[] };
+  return (json.data ?? []).map((p) => ({
+    id: p.id,
+    media_url: p.full_picture,
+    caption: p.message,
+    timestamp: p.created_time,
+    comments_count: p.comments?.summary?.total_count ?? 0,
+  }));
+}
+
 /** Busca caption/mídia de um post específico (usado ao registrar comentários). */
-export async function getPostById(postId: string): Promise<GraphPost | null> {
+export async function getPostById(postId: string, inboxId?: string | null): Promise<GraphPost | null> {
   try {
-    const token = await requireToken();
+    const token = await requireToken(inboxId);
     const res = await fetch(
       `${graphUrl(postId)}?fields=id,media_url,caption,timestamp,comments_count&access_token=${token}`
     );
@@ -188,8 +217,8 @@ export interface GraphComment {
 }
 
 /** Lista comentários de um post (Module 2.4). */
-export async function getPostComments(postId: string): Promise<GraphComment[]> {
-  const token = await requireToken();
+export async function getPostComments(postId: string, inboxId?: string | null): Promise<GraphComment[]> {
+  const token = await requireToken(inboxId);
   const res = await fetch(
     `${graphUrl(`${postId}/comments`)}?fields=id,username,text,timestamp,from&access_token=${token}`
   );

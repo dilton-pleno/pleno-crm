@@ -163,6 +163,7 @@ model Inbox {
 
   conversations Conversation[]
   channels      ContactChannel[]
+  postComments  PostComment[]
 
   @@map("inboxes")
 }
@@ -553,9 +554,14 @@ model PostComment {
   authorName    String    @map("author_name")
   authorId      String    @map("author_id")
   content       String
+  platform      String?   // "instagram" | "facebook"
+  inboxId       String?   @map("inbox_id") // Canal (página IG/FB) de origem
   repliedAt     DateTime? @map("replied_at")
   replyContent  String?   @map("reply_content")
   createdAt     DateTime  @default(now()) @map("created_at")
 
+  inbox Inbox? @relation(fields: [inboxId], references: [id])
+
+  @@index([inboxId])
   @@map("post_comments")
 }
