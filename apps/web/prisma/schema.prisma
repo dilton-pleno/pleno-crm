@@ -142,6 +142,32 @@ model NewsletterSubscriber {
 }
 
 // ============================================================
+// CANAIS (INBOXES) — uma "caixa"/conta de atendimento por setor.
+// Cada Canal agrupa, no máximo, 1 WhatsApp + 1 Instagram + 1 Facebook
+// próprios, com credenciais por Canal (preenchidas a partir da Fase 3).
+// Não confundir com ContactChannel (handle do contato) nem com ChannelType.
+// ============================================================
+
+model Inbox {
+  id     String  @id @default(uuid())
+  name   String // ex.: "Canal XPTO" — rótulo na UI: "Canal"
+  active Boolean @default(true)
+  // WhatsApp (Evolution): instância própria (a API key é global da Evolution).
+  whatsappInstance String? @map("whatsapp_instance")
+  // Meta mensageria por Canal: page/IG + token/verify cifrados em metaConfig.
+  metaPageId String? @map("meta_page_id")
+  metaIgId   String? @map("meta_ig_id")
+  metaConfig Json?   @map("meta_config") // accessTokenEnc, verifyTokenEnc (cifrados)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  conversations Conversation[]
+  channels      ContactChannel[]
+
+  @@map("inboxes")
+}
+
+// ============================================================
 // CONTATOS E CANAIS
 // ============================================================
 
@@ -230,13 +256,16 @@ model ContactChannel {
   contactId         String      @map("contact_id")
   channelType       ChannelType @map("channel_type")
   channelIdentifier String      @map("channel_identifier")
+  inboxId           String?     @map("inbox_id") // de qual Canal aquele handle veio
   metadata          Json?
   createdAt         DateTime    @default(now()) @map("created_at")
 
   contact       Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  inbox         Inbox?         @relation(fields: [inboxId], references: [id])
   conversations Conversation[]
 
   @@unique([channelType, channelIdentifier])
+  @@index([inboxId])
   @@map("contact_channels")
 }
 
@@ -254,6 +283,7 @@ model Conversation {
   id         String             @id @default(uuid())
   contactId  String             @map("contact_id")
   channelId  String             @map("channel_id")
+  inboxId    String?            @map("inbox_id") // Canal que originou a conversa
   status     ConversationStatus @default(open)
   assignedTo String?            @map("assigned_to")
   inboxName  String?            @map("inbox_name")
@@ -262,10 +292,12 @@ model Conversation {
 
   contact  Contact        @relation(fields: [contactId], references: [id])
   channel  ContactChannel @relation(fields: [channelId], references: [id])
+  inbox    Inbox?         @relation(fields: [inboxId], references: [id])
   agent    User?          @relation("AssignedTo", fields: [assignedTo], references: [id])
   messages Message[]
   cards    PipelineCard[]
 
+  @@index([inboxId])
   @@map("conversations")
 }
 
