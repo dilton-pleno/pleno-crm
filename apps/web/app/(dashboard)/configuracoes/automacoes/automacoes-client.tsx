@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   ArrowLeft, Plus, Trash2, Pencil, Zap, Power, ChevronUp, ChevronDown,
   MessageSquare, Tag as TagIcon, UserPlus, ListChecks, History,
-  LayoutGrid, Webhook, Clock,
+  LayoutGrid, Webhook, Clock, Sparkles,
 } from "lucide-react";
 
 const INPUT = "text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring";
@@ -99,6 +99,67 @@ function blankBuilder(): BuilderState {
   };
 }
 
+// Templates prontos: abrem o builder pré-preenchido para revisar e salvar.
+const TEMPLATES: { id: string; name: string; description: string; make: () => BuilderState }[] = [
+  {
+    id: "welcome",
+    name: "Boas-vindas",
+    description: "Responde automaticamente na primeira mensagem de um novo contato.",
+    make: () => ({
+      ...blankBuilder(),
+      name: "Boas-vindas",
+      trigger_type: "new_contact",
+      oncePerContact: true,
+      actions: [{ action_type: "send_message", config: { message: "Olá! Seja bem-vindo(a) à Meu Cuidado Essencial 👋 Como podemos ajudar?" } }],
+    }),
+  },
+  {
+    id: "afterhours",
+    name: "Fora do horário",
+    description: "Responde com aviso de ausência quando a mensagem chega fora do horário comercial (8h–18h).",
+    make: () => ({
+      ...blankBuilder(),
+      name: "Fora do horário",
+      trigger_type: "new_message",
+      useHours: true,
+      hoursStart: "08:00",
+      hoursEnd: "18:00",
+      hoursOutside: true,
+      actions: [{ action_type: "send_message", config: { message: "Olá! Nosso atendimento é de segunda a sexta, das 8h às 18h. Assim que retornarmos, falamos com você 🙏" } }],
+    }),
+  },
+  {
+    id: "triage",
+    name: "Triagem por palavra-chave",
+    description: "Ao detectar uma palavra-chave, etiqueta o contato e atribui a um agente (escolha o agente).",
+    make: () => ({
+      ...blankBuilder(),
+      name: "Triagem",
+      trigger_type: "keyword",
+      keyword: "orçamento",
+      actions: [
+        { action_type: "add_tag", config: { tag: "orçamento" } },
+        { action_type: "assign_agent", config: { user_id: "" } },
+      ] as BuilderAction[],
+    }),
+  },
+  {
+    id: "followup",
+    name: "Follow-up 24h",
+    description: "Aguarda 24h após o início da conversa e envia uma retomada (1× por contato). Requer o cron de retomada no N8N.",
+    make: () => ({
+      ...blankBuilder(),
+      name: "Follow-up 24h",
+      trigger_type: "conversation_opened",
+      oncePerContact: true,
+      actions: [
+        { action_type: "wait", config: { minutes: "1440" } },
+        { action_type: "send_message", config: { message: "Oi! Passando para saber se você ainda precisa de ajuda 😊" } },
+      ] as BuilderAction[],
+    }),
+  },
+];
+
 function fromAutomation(a: AutomationDetail): BuilderState {
   const c = a.trigger_config ?? {};
   const hours = c.hours as { start?: string; end?: string; outside?: boolean } | undefined;
@@ -158,12 +219,13 @@ function toPayload(s: BuilderState) {
 
 export function AutomacoesClient({ initialAutomations, inboxes, agents, tags, stages, isAdmin }: Props) {
   const [automations, setAutomations] = useState<AutomationDetail[]>(initialAutomations);
-  const [tab, setTab] = useState<"automacoes" | "execucoes">("automacoes");
+  const [tab, setTab] = useState<"automacoes" | "templates" | "execucoes">("automacoes");
   const [editing, setEditing] = useState<{ id: string | null; state: BuilderState } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const startNew = () => setEditing({ id: null, state: blankBuilder() });
   const startEdit = (a: AutomationDetail) => setEditing({ id: a.id, state: fromAutomation(a) });
+  const startFromTemplate = (make: () => BuilderState) => setEditing({ id: null, state: make() });
 
   const save = useCallback(async (id: string | null, state: BuilderState) => {
     setError(null);
@@ -235,10 +297,30 @@ export function AutomacoesClient({ initialAutomations, inboxes, agents, tags, st
 
       <div className="flex items-center gap-1 border-b border-border shrink-0">
         <TabBtn active={tab === "automacoes"} onClick={() => setTab("automacoes")} icon={ListChecks}>Automações</TabBtn>
+        {isAdmin && <TabBtn active={tab === "templates"} onClick={() => setTab("templates")} icon={Sparkles}>Templates</TabBtn>}
         <TabBtn active={tab === "execucoes"} onClick={() => setTab("execucoes")} icon={History}>Execuções</TabBtn>
       </div>
 
-      {tab === "automacoes" ? (
+      {tab === "templates" ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">Escolha um modelo pronto. Ele abre o construtor já preenchido para você revisar e salvar.</p>
+          {TEMPLATES.map((t) => (
+            <div key={t.id} className="bg-card border border-border rounded-lg p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-4 h-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">{t.name}</p>
+                <p className="text-xs text-muted-foreground">{t.description}</p>
+              </div>
+              <button onClick={() => startFromTemplate(t.make)}
+                className="flex items-center gap-1 text-xs bg-primary text-primary-foreground rounded-md px-3 py-2 hover:opacity-90 flex-shrink-0">
+                <Plus className="w-3.5 h-3.5" /> Usar
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : tab === "automacoes" ? (
         <div className="flex flex-col gap-2">
           {automations.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-10">Nenhuma automação ainda.</p>
