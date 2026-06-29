@@ -1,15 +1,25 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { managedTeamIds, visibleInboxIds, visiblePipelineIds } from "@/lib/visibility";
 import { TimesClient, type TeamDetail, type Option, type UserOption } from "./times-client";
 
 export default async function TimesPage() {
   const session = await auth();
   if (!session) redirect("/login");
-  if (session.user.role !== "ADMIN") redirect("/atendimento");
+
+  // ADMIN gere todos os times; Gestor gere só os seus; demais não acessam.
+  const managed = await managedTeamIds(session.user);
+  if (managed !== null && managed.length === 0) redirect("/atendimento");
+  const isAdmin = session.user.role === "ADMIN";
+
+  // Gestor só enxerga/vincula Canais e pipelines da sua visibilidade.
+  const visibleInbox = await visibleInboxIds(session.user);
+  const visiblePipes = await visiblePipelineIds(session.user);
 
   const [teams, users, inboxes, pipelines] = await Promise.all([
     prisma.team.findMany({
+      where: managed ? { id: { in: managed } } : {},
       orderBy: { createdAt: "asc" },
       include: {
         members: { include: { user: { select: { id: true, name: true, email: true, role: true } } } },
@@ -18,8 +28,16 @@ export default async function TimesPage() {
       },
     }),
     prisma.user.findMany({ where: { active: true }, select: { id: true, name: true, email: true, role: true }, orderBy: { name: "asc" } }),
-    prisma.inbox.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { createdAt: "asc" } }),
-    prisma.pipeline.findMany({ select: { id: true, name: true }, orderBy: { createdAt: "asc" } }),
+    prisma.inbox.findMany({
+      where: { active: true, ...(visibleInbox ? { id: { in: visibleInbox } } : {}) },
+      select: { id: true, name: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.pipeline.findMany({
+      where: visiblePipes ? { id: { in: visiblePipes } } : {},
+      select: { id: true, name: true },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
 
   const initialTeams: TeamDetail[] = teams.map((t) => ({
@@ -46,6 +64,7 @@ export default async function TimesPage() {
       users={userOptions}
       inboxes={inboxOptions}
       pipelines={pipelineOptions}
+      isAdmin={isAdmin}
     />
   );
 }

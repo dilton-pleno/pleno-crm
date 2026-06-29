@@ -26,9 +26,11 @@ interface Props {
   users: UserOption[];
   inboxes: Option[];
   pipelines: Option[];
+  /** ADMIN pode criar/excluir times; Gestor só gerencia os seus. */
+  isAdmin: boolean;
 }
 
-export function TimesClient({ initialTeams, users, inboxes, pipelines }: Props) {
+export function TimesClient({ initialTeams, users, inboxes, pipelines, isAdmin }: Props) {
   const [teams, setTeams] = useState<TeamDetail[]>(initialTeams);
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,7 +78,9 @@ export function TimesClient({ initialTeams, users, inboxes, pipelines }: Props) 
         <div>
           <h1 className="text-lg font-semibold text-foreground">Times</h1>
           <p className="text-sm text-muted-foreground">
-            Setores com membros, Canais e pipelines. A visibilidade por time é aplicada na próxima etapa.
+            {isAdmin
+              ? "Setores com membros, Canais e pipelines. A visibilidade é por time."
+              : "Gerencie os times que você lidera: membros, Canais e pipelines."}
           </p>
         </div>
       </div>
@@ -87,7 +91,8 @@ export function TimesClient({ initialTeams, users, inboxes, pipelines }: Props) 
         </div>
       )}
 
-      {/* Novo time */}
+      {/* Novo time (apenas ADMIN) */}
+      {isAdmin && (
       <div className="bg-card border border-border rounded-lg p-4 flex items-center gap-2 shrink-0">
         <input
           value={newName}
@@ -104,6 +109,7 @@ export function TimesClient({ initialTeams, users, inboxes, pipelines }: Props) 
           <Plus className="w-3.5 h-3.5" /> Criar time
         </button>
       </div>
+      )}
 
       <div className="flex flex-col gap-4">
         {teams.length === 0 ? (
@@ -116,6 +122,7 @@ export function TimesClient({ initialTeams, users, inboxes, pipelines }: Props) 
               users={users}
               inboxes={inboxes}
               pipelines={pipelines}
+              canDelete={isAdmin}
               onPatch={(patch) => patchLocal(team.id, patch)}
               onRemove={() => void removeTeam(team.id)}
             />
@@ -127,12 +134,13 @@ export function TimesClient({ initialTeams, users, inboxes, pipelines }: Props) 
 }
 
 function TeamCard({
-  team, users, inboxes, pipelines, onPatch, onRemove,
+  team, users, inboxes, pipelines, canDelete, onPatch, onRemove,
 }: {
   team: TeamDetail;
   users: UserOption[];
   inboxes: Option[];
   pipelines: Option[];
+  canDelete: boolean;
   onPatch: (patch: Partial<TeamDetail>) => void;
   onRemove: () => void;
 }) {
@@ -243,9 +251,11 @@ function TeamCard({
           className="flex-1 text-sm font-semibold bg-background border border-border rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
         />
         {savingName && <span className="text-[10px] text-muted-foreground">salvando…</span>}
-        <button onClick={onRemove} className="p-1.5 text-destructive hover:bg-destructive/10 rounded" title="Excluir time">
-          <Trash2 className="w-4 h-4" />
-        </button>
+        {canDelete && (
+          <button onClick={onRemove} className="p-1.5 text-destructive hover:bg-destructive/10 rounded" title="Excluir time">
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Membros */}

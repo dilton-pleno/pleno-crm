@@ -73,3 +73,26 @@ export async function canSeeInbox(user: VisibilityUser, inboxId: string): Promis
   const ids = await visibleInboxIds(user);
   return ids === null || ids.includes(inboxId);
 }
+
+/**
+ * Ids dos times que o usuário GERENCIA (isManager). ADMIN → `null` (todos).
+ * Gestor → seus times de gestão. Atendente → `[]`.
+ */
+export async function managedTeamIds(user: VisibilityUser): Promise<string[] | null> {
+  if (user.role === "ADMIN") return null;
+  const rows = await prisma.teamMember.findMany({
+    where: { userId: user.id, isManager: true },
+    select: { teamId: true },
+  });
+  return rows.map((r) => r.teamId);
+}
+
+/** O usuário gerencia este time? (ADMIN sempre pode). */
+export async function isTeamManager(user: VisibilityUser, teamId: string): Promise<boolean> {
+  if (user.role === "ADMIN") return true;
+  const m = await prisma.teamMember.findUnique({
+    where: { teamId_userId: { teamId, userId: user.id } },
+    select: { isManager: true },
+  });
+  return Boolean(m?.isManager);
+}

@@ -12,6 +12,7 @@ import {
   BarChart2,
   ShoppingCart,
   Users,
+  UsersRound,
   Settings,
   Zap,
   Plug,
@@ -34,6 +35,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Campanhas",   href: "/campanhas",   icon: BarChart2,     module: "campanhas"   },
   { label: "Ecommerce",   href: "/ecommerce",   icon: ShoppingCart,  module: "ecommerce"   },
   { label: "Automações",  href: "/configuracoes/automacoes", icon: Zap, module: "automacoes" },
+  // Times: o Gestor gerencia os seus por aqui; o Admin acessa por Configurações.
+  { label: "Times", href: "/configuracoes/times", icon: UsersRound, module: "atendimento", roles: ["GESTOR"] },
   // Integrações fica só para Gestor/Atendente: o Admin acessa por Configurações.
   { label: "Integrações", href: "/configuracoes/integracoes", icon: Plug, module: "integracoes", roles: ["GESTOR", "ATENDENTE"] },
   { label: "Configurações", href: "/configuracoes", icon: Settings,  module: "configuracoes" },

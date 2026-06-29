@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAccess } from "@/lib/api-auth";
+import { requireAccess, requireRoles } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { managedTeamIds } from "@/lib/visibility";
 
 // Serializa um time com membros, Canais e pipelines vinculados.
 const teamInclude = {
@@ -37,10 +38,13 @@ function serialize(t: TeamWithRels) {
 }
 
 export async function GET(): Promise<NextResponse> {
-  const guard = await requireAccess("configuracoes", "full");
+  // ADMIN vê todos os times; Gestor vê só os que gerencia; demais, nada.
+  const guard = await requireAccess("atendimento", "full");
   if (!guard.ok) return guard.response;
 
+  const managed = await managedTeamIds(guard.session.user);
   const teams = await prisma.team.findMany({
+    where: managed ? { id: { in: managed } } : {},
     orderBy: { createdAt: "asc" },
     include: teamInclude,
   });
@@ -51,7 +55,8 @@ export async function GET(): Promise<NextResponse> {
 const createSchema = z.object({ name: z.string().min(1).max(60) });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const guard = await requireAccess("configuracoes", "full");
+  // Criar time é exclusivo do ADMIN.
+  const guard = await requireRoles(["ADMIN"]);
   if (!guard.ok) return guard.response;
 
   const parsed = createSchema.safeParse(await request.json());
