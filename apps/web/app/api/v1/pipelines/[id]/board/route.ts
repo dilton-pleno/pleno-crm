@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma, ChannelType } from "@prisma/client";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { visibleInboxIds } from "@/lib/visibility";
 
 const CHANNEL_VALUES: ChannelType[] = ["whatsapp", "instagram", "messenger", "email", "site"];
 
@@ -27,6 +28,9 @@ export async function GET(
   if (channelParam && (CHANNEL_VALUES as string[]).includes(channelParam)) {
     conversationFilter.channel = { channelType: channelParam as ChannelType };
   }
+  // Visibilidade por time: restringe os cards aos Canais visíveis.
+  const visible = await visibleInboxIds(guard.session.user);
+  if (visible) conversationFilter.inboxId = { in: visible };
 
   const cardWhere: Prisma.PipelineCardWhereInput = {};
   if (Object.keys(conversationFilter).length > 0) {

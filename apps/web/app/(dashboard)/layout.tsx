@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { visibleInboxIds } from "@/lib/visibility";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import type { Role } from "@pleno-crm/types";
@@ -16,9 +17,11 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  // Canais ativos para a Caixa de Entrada (na Fase 4 será filtrado por Time).
+  // Canais ativos para a Caixa de Entrada, restritos à visibilidade do usuário
+  // (null = sem restrição: ADMIN ou usuário sem time).
+  const visible = await visibleInboxIds(session.user);
   const inboxes = await prisma.inbox.findMany({
-    where: { active: true },
+    where: { active: true, ...(visible ? { id: { in: visible } } : {}) },
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true },
   });

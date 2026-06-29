@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getAccessLevel } from "@/lib/permissions";
+import { canSeeInbox } from "@/lib/visibility";
 import { ComentariosClient } from "../../../comentarios/comentarios-client";
 import { InboxShell } from "@/components/inbox/inbox-shell";
 
@@ -19,6 +20,7 @@ export default async function CanalComentariosPage({
     select: { id: true, name: true },
   });
   if (!inbox) notFound();
+  if (!(await canSeeInbox(session.user, inbox.id))) notFound();
 
   const canReply = getAccessLevel(session.user.role, "atendimento") === "full";
 

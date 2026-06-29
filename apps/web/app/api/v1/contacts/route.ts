@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { visibleInboxIds } from "@/lib/visibility";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const guard = await requireAccess("contatos");
@@ -29,6 +30,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         ],
       }
     : {};
+
+  // Visibilidade por time: só contatos com algum canal em um Canal visível.
+  const visible = await visibleInboxIds(guard.session.user);
+  if (visible) {
+    where.channels = { some: { inboxId: { in: visible } } };
+  }
 
   const [contacts, total] = await Promise.all([
     prisma.contact.findMany({

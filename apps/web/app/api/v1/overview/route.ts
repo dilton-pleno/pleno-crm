@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
 import { getAccessLevel } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { visibleInboxIds } from "@/lib/visibility";
 import { summarize, dec, type CampaignRow } from "@/lib/analytics-query";
 
 export async function GET(): Promise<NextResponse> {
@@ -13,11 +14,15 @@ export async function GET(): Promise<NextResponse> {
   const last7 = new Date(now.getTime() - 7 * 86400000);
   const last30 = new Date(now.getTime() - 30 * 86400000);
 
-  // ---- Atendimento ----
+  // ---- Atendimento (respeita a visibilidade por time) ----
+  const visible = await visibleInboxIds(guard.session.user);
+  const convInbox = visible ? { inboxId: { in: visible } } : {};
   const [statusGroups, unread, newConversations] = await Promise.all([
-    prisma.conversation.groupBy({ by: ["status"], _count: { id: true } }),
-    prisma.message.count({ where: { direction: "in", readAt: null } }),
-    prisma.conversation.count({ where: { createdAt: { gte: last7 } } }),
+    prisma.conversation.groupBy({ by: ["status"], _count: { id: true }, where: convInbox }),
+    prisma.message.count({
+      where: { direction: "in", readAt: null, ...(visible ? { conversation: { inboxId: { in: visible } } } : {}) },
+    }),
+    prisma.conversation.count({ where: { createdAt: { gte: last7 }, ...convInbox } }),
   ]);
   const statusMap: Record<string, number> = {};
   for (const g of statusGroups) statusMap[g.status] = g._count.id;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { visibleInboxIds } from "@/lib/visibility";
 import type { ConversationStatus } from "@prisma/client";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -17,9 +18,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10)));
   const skip = (page - 1) * limit;
 
+  // Visibilidade por time: combina o filtro explícito de Canal com os Canais
+  // que o usuário pode ver (null = sem restrição: ADMIN ou usuário sem time).
+  const visible = await visibleInboxIds(session.user);
+  let inboxWhere: { inboxId?: string | { in: string[] } } = {};
+  if (inboxId) {
+    if (visible && !visible.includes(inboxId)) {
+      return NextResponse.json({ data: [], meta: { total: 0, page, limit } });
+    }
+    inboxWhere = { inboxId };
+  } else if (visible) {
+    inboxWhere = { inboxId: { in: visible } };
+  }
+
   const where = {
     ...(status ? { status } : {}),
-    ...(inboxId ? { inboxId } : {}),
+    ...inboxWhere,
     ...(assignedTo === "me"
       ? { assignedTo: session.user.id }
       : assignedTo === "unassigned"

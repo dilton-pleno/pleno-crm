@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { canSeeInbox } from "@/lib/visibility";
 import { InboxClient } from "../../inbox-client";
 import { InboxShell } from "@/components/inbox/inbox-shell";
 
@@ -18,6 +19,7 @@ export default async function CanalConversasPage({
     select: { id: true, name: true },
   });
   if (!inbox) notFound();
+  if (!(await canSeeInbox(session.user, inbox.id))) notFound();
 
   const agents = await prisma.user.findMany({
     where: { active: true },
