@@ -32,6 +32,7 @@ export function UsuariosClient({ currentUserId }: Props) {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<"create" | "edit" | null>(null);
   const [editing, setEditing] = useState<UserItem | null>(null);
+  const [resetUser, setResetUser] = useState<UserItem | null>(null);
   const [resetResult, setResetResult] = useState<{ name: string; password: string } | null>(null);
 
   const fetchUsers = useCallback(async () => {
@@ -50,14 +51,6 @@ export function UsuariosClient({ currentUserId }: Props) {
   useEffect(() => {
     void fetchUsers();
   }, [fetchUsers]);
-
-  const handleResetPassword = useCallback(async (user: UserItem) => {
-    const res = await fetch(`/api/v1/users/${user.id}/reset-password`, { method: "POST" });
-    if (res.ok) {
-      const json = (await res.json()) as { data: { password: string } };
-      setResetResult({ name: user.name, password: json.data.password });
-    }
-  }, []);
 
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-4 max-w-3xl mx-auto w-full">
@@ -122,7 +115,7 @@ export function UsuariosClient({ currentUserId }: Props) {
                   <Pencil className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => void handleResetPassword(u)}
+                  onClick={() => setResetUser(u)}
                   className="p-1.5 text-muted-foreground hover:bg-accent rounded"
                   title="Redefinir senha"
                 >
@@ -161,6 +154,129 @@ export function UsuariosClient({ currentUserId }: Props) {
           }}
         />
       )}
+
+      {resetUser && (
+        <ResetPasswordModal
+          user={resetUser}
+          onClose={() => setResetUser(null)}
+          onSaved={(password) => {
+            setResetResult({ name: resetUser.name, password });
+            setResetUser(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PasswordField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Senha"
+          className="flex-1 text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        <button
+          type="button"
+          onClick={() => onChange(generatePassword(14))}
+          className="flex items-center gap-1 text-xs bg-card border border-border rounded-md px-2.5 py-2 hover:bg-accent whitespace-nowrap"
+          title="Gerar senha forte"
+        >
+          <Sparkles className="w-3.5 h-3.5" /> Gerar
+        </button>
+      </div>
+      {value.length > 0 && (
+        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+          {passwordChecks(value).map((c) => (
+            <span
+              key={c.key}
+              className={`text-[10px] flex items-center gap-1 ${c.ok ? "text-green-600" : "text-muted-foreground"}`}
+            >
+              {c.ok ? <Check className="w-2.5 h-2.5" /> : <X className="w-2.5 h-2.5" />}
+              {c.label}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResetPasswordModal({
+  user,
+  onClose,
+  onSaved,
+}: {
+  user: UserItem;
+  onClose: () => void;
+  onSaved: (password: string) => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/users/${user.id}/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        onSaved(password);
+      } else {
+        setError(json.error?.message ?? "Falha ao redefinir senha");
+      }
+    } finally {
+      setSaving(false);
+    }
+  }, [password, user.id, onSaved]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-sm bg-background border border-border rounded-lg shadow-xl p-5 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Redefinir senha de {user.name}</h2>
+          <button onClick={onClose} className="p-1 text-muted-foreground hover:text-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
+            {error}
+          </div>
+        )}
+
+        <PasswordField value={password} onChange={setPassword} />
+
+        <div className="flex items-center justify-end gap-2 mt-1">
+          <button onClick={onClose} className="text-xs text-muted-foreground hover:bg-accent rounded-md px-3 py-1.5">
+            Cancelar
+          </button>
+          <button
+            onClick={() => void submit()}
+            disabled={saving || !isPasswordValid(password)}
+            className="text-xs bg-primary text-primary-foreground rounded-md px-3 py-1.5 hover:opacity-90 disabled:opacity-40"
+          >
+            {saving ? "Salvando..." : "Redefinir senha"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -297,38 +413,10 @@ function UserFormModal({
           className="text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
         />
         {mode === "create" && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={form.password}
-                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                placeholder="Senha"
-                className="flex-1 text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-              <button
-                type="button"
-                onClick={() => setForm((f) => ({ ...f, password: generatePassword(14) }))}
-                className="flex items-center gap-1 text-xs bg-card border border-border rounded-md px-2.5 py-2 hover:bg-accent whitespace-nowrap"
-                title="Gerar senha forte"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> Gerar
-              </button>
-            </div>
-            {form.password.length > 0 && (
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-                {passwordChecks(form.password).map((c) => (
-                  <span
-                    key={c.key}
-                    className={`text-[10px] flex items-center gap-1 ${c.ok ? "text-green-600" : "text-muted-foreground"}`}
-                  >
-                    {c.ok ? <Check className="w-2.5 h-2.5" /> : <X className="w-2.5 h-2.5" />}
-                    {c.label}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          <PasswordField
+            value={form.password}
+            onChange={(v) => setForm((f) => ({ ...f, password: v }))}
+          />
         )}
 
         <label className="text-xs text-muted-foreground flex flex-col gap-1">
