@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Send, Paperclip, Zap, Plus, Trash2, X } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Send, Paperclip, Zap, Plus, Trash2, X, Smile } from "lucide-react";
+import type { EmojiClickData } from "emoji-picker-react";
+
+// Picker é client-only e pesado; carrega sob demanda para não afetar o SSR.
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 interface Props {
   conversationId: string;
@@ -93,12 +98,25 @@ export function MessageInput({ conversationId, onMessageSent }: Props) {
   }, [content, conversationId, onMessageSent, sending, file, sendFile]);
 
   const [showReplies, setShowReplies] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
 
   const insertReply = useCallback((text: string) => {
     setContent((prev) => (prev.trim() ? `${prev}\n${text}` : text));
     setShowReplies(false);
     textareaRef.current?.focus();
   }, []);
+
+  const insertEmoji = useCallback((emoji: string) => {
+    const el = textareaRef.current;
+    const start = el?.selectionStart ?? content.length;
+    const end = el?.selectionEnd ?? content.length;
+    setContent(content.slice(0, start) + emoji + content.slice(end));
+    requestAnimationFrame(() => {
+      el?.focus();
+      const pos = start + emoji.length;
+      el?.setSelectionRange(pos, pos);
+    });
+  }, [content]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -173,6 +191,32 @@ export function MessageInput({ conversationId, onMessageSent }: Props) {
           </button>
           {showReplies && (
             <QuickReplyPicker onInsert={insertReply} onClose={() => setShowReplies(false)} />
+          )}
+        </div>
+
+        <div className="relative flex-shrink-0">
+          <button
+            onClick={() => setShowEmoji((v) => !v)}
+            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+            title="Emojis"
+          >
+            <Smile className="w-4 h-4" />
+          </button>
+          {showEmoji && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowEmoji(false)} />
+              <div className="absolute bottom-full mb-2 left-0 z-20">
+                <EmojiPicker
+                  onEmojiClick={(data: EmojiClickData) => {
+                    insertEmoji(data.emoji);
+                    setShowEmoji(false);
+                  }}
+                  lazyLoadEmojis
+                  width={320}
+                  height={380}
+                />
+              </div>
+            </>
           )}
         </div>
 
