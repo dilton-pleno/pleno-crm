@@ -39,7 +39,62 @@ model User {
   integrationRequestsMade     IntegrationRequest[] @relation("RequestedBy")
   integrationRequestsApproved IntegrationRequest[] @relation("ApprovedBy")
 
+  teamMemberships TeamMember[]
+
   @@map("users")
+}
+
+// ============================================================
+// TIMES (SETORES) — agrupam usuários e dão acesso a Canais/Pipelines
+// ============================================================
+
+model Team {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  members   TeamMember[]
+  inboxes   TeamInbox[]
+  pipelines TeamPipeline[] // pipeline pode ser compartilhado entre times (m2m)
+
+  @@map("teams")
+}
+
+model TeamMember {
+  teamId    String  @map("team_id")
+  userId    String  @map("user_id")
+  isManager Boolean @default(false) @map("is_manager") // Gestor do time
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, userId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model TeamInbox {
+  teamId  String @map("team_id")
+  inboxId String @map("inbox_id")
+
+  team  Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  inbox Inbox @relation(fields: [inboxId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, inboxId])
+  @@index([inboxId])
+  @@map("team_inboxes")
+}
+
+model TeamPipeline {
+  teamId     String @map("team_id")
+  pipelineId String @map("pipeline_id")
+
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, pipelineId])
+  @@index([pipelineId])
+  @@map("team_pipelines")
 }
 
 model IntegrationRequest {
@@ -164,6 +219,7 @@ model Inbox {
   conversations Conversation[]
   channels      ContactChannel[]
   postComments  PostComment[]
+  teams         TeamInbox[]
 
   @@map("inboxes")
 }
@@ -350,6 +406,7 @@ model Pipeline {
 
   creator User            @relation("CreatedBy", fields: [createdBy], references: [id])
   stages  PipelineStage[]
+  teams   TeamPipeline[]
 
   @@map("pipelines")
 }

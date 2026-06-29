@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { SlidersHorizontal, Zap, Users, Plug, ChevronRight, Tag, MessageSquareText, Radio } from "lucide-react";
+import { SlidersHorizontal, Zap, Users, Plug, ChevronRight, Tag, MessageSquareText, Radio, UsersRound } from "lucide-react";
 
 export default async function ConfiguracoesPage() {
   const session = await auth();
@@ -20,6 +20,12 @@ export default async function ConfiguracoesPage() {
       icon: Radio,
       title: "Canais",
       description: "Caixas de atendimento (WhatsApp + Instagram + Facebook) por setor",
+    },
+    {
+      href: "/configuracoes/times",
+      icon: UsersRound,
+      title: "Times",
+      description: "Setores com membros, Canais e pipelines (visibilidade por time)",
     },
     {
       href: "/configuracoes/integracoes",
