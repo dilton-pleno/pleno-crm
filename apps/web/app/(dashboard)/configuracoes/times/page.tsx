@@ -17,7 +17,7 @@ export default async function TimesPage() {
   const visibleInbox = await visibleInboxIds(session.user);
   const visiblePipes = await visiblePipelineIds(session.user);
 
-  const [teams, users, inboxes, pipelines] = await Promise.all([
+  const [teams, allTeams, users, inboxes, pipelines] = await Promise.all([
     prisma.team.findMany({
       where: managed ? { id: { in: managed } } : {},
       orderBy: { createdAt: "asc" },
@@ -27,6 +27,8 @@ export default async function TimesPage() {
         pipelines: { select: { pipelineId: true } },
       },
     }),
+    // Todos os times (id+nome) para escolher destino ao compartilhar.
+    prisma.team.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, name: true } }),
     prisma.user.findMany({ where: { active: true }, select: { id: true, name: true, email: true, role: true }, orderBy: { name: "asc" } }),
     prisma.inbox.findMany({
       where: { active: true, ...(visibleInbox ? { id: { in: visibleInbox } } : {}) },
@@ -64,6 +66,7 @@ export default async function TimesPage() {
       users={userOptions}
       inboxes={inboxOptions}
       pipelines={pipelineOptions}
+      allTeams={allTeams.map((t) => ({ id: t.id, name: t.name }))}
       isAdmin={isAdmin}
     />
   );

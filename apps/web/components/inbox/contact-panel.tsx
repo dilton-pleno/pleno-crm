@@ -82,8 +82,32 @@ export function ContactPanel({
 }: Props) {
   const [suggestions, setSuggestions] = useState<LinkSuggestion[]>([]);
   const [linking, setLinking] = useState<string | null>(null);
+  // Agentes elegíveis (membros do time do Canal). Inicia com a lista global
+  // recebida e é estreitada pela conversa selecionada.
+  const [assignableAgents, setAssignableAgents] = useState<Agent[]>(agents);
 
   const contactId = contact?.id ?? null;
+  const convId = conversation?.id ?? null;
+
+  useEffect(() => {
+    const canAssign = currentUserRole === "ADMIN" || currentUserRole === "GESTOR";
+    if (!convId || !canAssign) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/v1/conversations/${convId}/assignable-agents`);
+        if (res.ok) {
+          const json = (await res.json()) as { data: Agent[] };
+          if (!cancelled) setAssignableAgents(json.data);
+        }
+      } catch {
+        /* mantém a lista atual em caso de falha */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [convId, currentUserRole]);
 
   useEffect(() => {
     if (!contactId || !canLink) {
@@ -198,7 +222,10 @@ export function ContactPanel({
             className="w-full text-xs bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
           >
             <option value="">Não atribuída</option>
-            {agents.map((a) => (
+            {(conversation.assignedTo && !assignableAgents.some((a) => a.id === conversation.assignedTo!.id)
+              ? [{ id: conversation.assignedTo.id, name: conversation.assignedTo.name }, ...assignableAgents]
+              : assignableAgents
+            ).map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
                 {a.id === currentUserId ? " (eu)" : ""}

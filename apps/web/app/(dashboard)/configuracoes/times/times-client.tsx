@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Users, Radio, SlidersHorizontal, Save, Crown } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Users, Radio, SlidersHorizontal, Save, Crown, Share2 } from "lucide-react";
 
 export interface UserOption { id: string; name: string; email: string; role: string }
 export interface Option { id: string; name: string }
@@ -26,11 +26,13 @@ interface Props {
   users: UserOption[];
   inboxes: Option[];
   pipelines: Option[];
+  /** Todos os times (id+nome) para escolher destino ao compartilhar. */
+  allTeams: Option[];
   /** ADMIN pode criar/excluir times; Gestor só gerencia os seus. */
   isAdmin: boolean;
 }
 
-export function TimesClient({ initialTeams, users, inboxes, pipelines, isAdmin }: Props) {
+export function TimesClient({ initialTeams, users, inboxes, pipelines, allTeams, isAdmin }: Props) {
   const [teams, setTeams] = useState<TeamDetail[]>(initialTeams);
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -122,6 +124,7 @@ export function TimesClient({ initialTeams, users, inboxes, pipelines, isAdmin }
               users={users}
               inboxes={inboxes}
               pipelines={pipelines}
+              allTeams={allTeams}
               canDelete={isAdmin}
               onPatch={(patch) => patchLocal(team.id, patch)}
               onRemove={() => void removeTeam(team.id)}
@@ -134,21 +137,55 @@ export function TimesClient({ initialTeams, users, inboxes, pipelines, isAdmin }
 }
 
 function TeamCard({
-  team, users, inboxes, pipelines, canDelete, onPatch, onRemove,
+  team, users, inboxes, pipelines, allTeams, canDelete, onPatch, onRemove,
 }: {
   team: TeamDetail;
   users: UserOption[];
   inboxes: Option[];
   pipelines: Option[];
+  allTeams: Option[];
   canDelete: boolean;
   onPatch: (patch: Partial<TeamDetail>) => void;
   onRemove: () => void;
 }) {
+  const inboxName = (id: string) => inboxes.find((i) => i.id === id)?.name ?? id;
+  const pipelineName = (id: string) => pipelines.find((p) => p.id === id)?.name ?? id;
+  const otherTeams = allTeams.filter((t) => t.id !== team.id);
   const [name, setName] = useState(team.name);
   const [savingName, setSavingName] = useState(false);
   const [savingMembers, setSavingMembers] = useState(false);
   const [savingInboxes, setSavingInboxes] = useState(false);
   const [savingPipelines, setSavingPipelines] = useState(false);
+  const [shareResource, setShareResource] = useState("");
+  const [shareTarget, setShareTarget] = useState("");
+  const [sharing, setSharing] = useState(false);
+  const [shareMsg, setShareMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const share = async () => {
+    if (!shareResource || !shareTarget || sharing) return;
+    setSharing(true);
+    setShareMsg(null);
+    try {
+      const [kind, rid] = shareResource.split(":");
+      const body = kind === "inbox" ? { inbox_id: rid } : { pipeline_id: rid };
+      const res = await fetch(`/api/v1/teams/${shareTarget}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        const tname = otherTeams.find((t) => t.id === shareTarget)?.name ?? "outro time";
+        setShareMsg({ kind: "ok", text: `Compartilhado com ${tname}.` });
+        setShareResource("");
+        setShareTarget("");
+      } else {
+        setShareMsg({ kind: "err", text: json.error?.message ?? "Falha ao compartilhar" });
+      }
+    } finally {
+      setSharing(false);
+    }
+  };
 
   const memberMap = new Map(team.members.map((m) => [m.user_id, m]));
 
@@ -319,6 +356,54 @@ function TeamCard({
           </div>
         )}
       </Section>
+
+      {/* Compartilhar um Canal/pipeline deste time com outro time */}
+      {otherTeams.length > 0 && (team.inbox_ids.length > 0 || team.pipeline_ids.length > 0) && (
+        <div className="border-t border-border pt-3 flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Share2 className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-semibold text-foreground">Compartilhar com outro time</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={shareResource}
+              onChange={(e) => setShareResource(e.target.value)}
+              className="text-xs bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="">Recurso…</option>
+              {team.inbox_ids.map((id) => (
+                <option key={`i-${id}`} value={`inbox:${id}`}>Canal: {inboxName(id)}</option>
+              ))}
+              {team.pipeline_ids.map((id) => (
+                <option key={`p-${id}`} value={`pipe:${id}`}>Pipeline: {pipelineName(id)}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">→</span>
+            <select
+              value={shareTarget}
+              onChange={(e) => setShareTarget(e.target.value)}
+              className="text-xs bg-background border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="">Time destino…</option>
+              {otherTeams.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => void share()}
+              disabled={!shareResource || !shareTarget || sharing}
+              className="flex items-center gap-1 text-[11px] bg-primary text-primary-foreground rounded px-2 py-1.5 hover:opacity-90 disabled:opacity-40"
+            >
+              <Share2 className="w-3 h-3" /> {sharing ? "Compartilhando…" : "Compartilhar"}
+            </button>
+          </div>
+          {shareMsg && (
+            <p className={`text-[11px] ${shareMsg.kind === "ok" ? "text-green-600" : "text-destructive"}`}>
+              {shareMsg.text}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
