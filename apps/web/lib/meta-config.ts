@@ -2,10 +2,10 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/crypto";
 
-// Credenciais Meta (Facebook/Instagram/Messenger + Ads) configuráveis pelo
-// painel. Segredos ficam cifrados no IntegrationConfig (provider "meta").
-// Mantém fallback para variáveis de ambiente, para não quebrar produção
-// enquanto a migração para o painel não acontece.
+// Credenciais Meta de MENSAGERIA (Instagram Direct/Comentários + Messenger)
+// configuráveis pelo painel. Anúncios ficam em lib/meta-ads-config.ts.
+// Segredos cifrados no IntegrationConfig (provider "meta"). Mantém fallback
+// para variáveis de ambiente, para não quebrar produção.
 const PROVIDER = "meta";
 
 export interface MetaConfig {
@@ -13,7 +13,7 @@ export interface MetaConfig {
   appSecret: string | null;
   accessToken: string | null;
   pageId: string | null;
-  adAccountId: string | null;
+  igId: string | null;
   verifyToken: string | null;
 }
 
@@ -21,7 +21,7 @@ export interface MetaConfig {
 interface StoredMeta {
   appId?: string;
   pageId?: string;
-  adAccountId?: string;
+  igId?: string;
   appSecretEnc?: string;
   accessTokenEnc?: string;
   verifyTokenEnc?: string;
@@ -45,7 +45,7 @@ export async function getMetaConfig(): Promise<MetaConfig> {
     appSecret: dec(s.appSecretEnc) ?? process.env.META_APP_SECRET ?? null,
     accessToken: dec(s.accessTokenEnc) ?? process.env.META_ACCESS_TOKEN ?? null,
     pageId: s.pageId || process.env.META_PAGE_ID || null,
-    adAccountId: s.adAccountId || process.env.META_AD_ACCOUNT_ID || null,
+    igId: s.igId || process.env.META_IG_ID || null,
     verifyToken: dec(s.verifyTokenEnc) ?? process.env.META_WEBHOOK_VERIFY_TOKEN ?? null,
   };
 }
@@ -55,7 +55,7 @@ export interface SaveMetaInput {
   appSecret?: string;
   accessToken?: string;
   pageId?: string;
-  adAccountId?: string;
+  igId?: string;
   verifyToken?: string;
 }
 
@@ -67,7 +67,7 @@ export async function saveMetaConfig(input: SaveMetaInput): Promise<void> {
 
   if (input.appId !== undefined) next.appId = input.appId.trim() || undefined;
   if (input.pageId !== undefined) next.pageId = input.pageId.trim() || undefined;
-  if (input.adAccountId !== undefined) next.adAccountId = input.adAccountId.trim() || undefined;
+  if (input.igId !== undefined) next.igId = input.igId.trim() || undefined;
   if (input.appSecret) next.appSecretEnc = encrypt(input.appSecret);
   if (input.accessToken) next.accessTokenEnc = encrypt(input.accessToken);
   if (input.verifyToken) next.verifyTokenEnc = encrypt(input.verifyToken);
@@ -91,7 +91,7 @@ export async function getMetaStatus(): Promise<{
   appSecret: boolean;
   accessToken: boolean;
   pageId: string | null;
-  adAccountId: string | null;
+  igId: string | null;
   verifyToken: boolean;
 }> {
   const cfg = await getMetaConfig();
@@ -100,7 +100,7 @@ export async function getMetaStatus(): Promise<{
     appSecret: Boolean(cfg.appSecret),
     accessToken: Boolean(cfg.accessToken),
     pageId: cfg.pageId,
-    adAccountId: cfg.adAccountId,
+    igId: cfg.igId,
     verifyToken: Boolean(cfg.verifyToken),
   };
 }

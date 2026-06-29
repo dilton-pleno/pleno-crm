@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireInternalSecret } from "@/lib/internal-auth";
 import { campaignSyncSchema, upsertCampaignMetrics } from "@/lib/analytics-sync";
-import { getMetaConfig } from "@/lib/meta-config";
+import { getMetaAdsConfig } from "@/lib/meta-ads-config";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const unauthorized = requireInternalSecret(request);
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const { adAccountId } = await getMetaConfig();
+  const { adAccountId } = await getMetaAdsConfig();
   const count = await upsertCampaignMetrics("meta", parsed.data, adAccountId ?? "unknown");
 
   return NextResponse.json({ data: { synced: count, upserted: count } });
