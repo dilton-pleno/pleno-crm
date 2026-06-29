@@ -1,8 +1,6 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { findChats, findMessages, type WaMessageRecord } from "@/lib/evolution";
-
-const PROVIDER = "whatsapp";
+import { getWhatsappConfig, mergeWhatsappConfig } from "@/lib/whatsapp-config";
 
 function extractPhone(remoteJid: string): string {
   return remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "").split(":")[0] ?? remoteJid;
@@ -98,23 +96,12 @@ export interface BackfillProgress {
 }
 
 async function setProgress(p: BackfillProgress): Promise<void> {
-  await prisma.integrationConfig.upsert({
-    where: { provider: PROVIDER },
-    update: { config: { lastHistoryImport: p } as unknown as Prisma.InputJsonValue },
-    create: {
-      provider: PROVIDER,
-      apiUser: "",
-      apiSecret: "",
-      active: true,
-      config: { lastHistoryImport: p } as unknown as Prisma.InputJsonValue,
-    },
-  });
+  await mergeWhatsappConfig({ lastHistoryImport: p });
 }
 
 export async function getBackfillProgress(): Promise<BackfillProgress | null> {
-  const cfg = await prisma.integrationConfig.findUnique({ where: { provider: PROVIDER } });
-  const raw = (cfg?.config as { lastHistoryImport?: BackfillProgress } | null)?.lastHistoryImport;
-  return raw ?? null;
+  const cfg = await getWhatsappConfig();
+  return (cfg.lastHistoryImport as BackfillProgress | undefined) ?? null;
 }
 
 const PAGE_LIMIT = 50;
