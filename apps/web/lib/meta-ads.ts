@@ -2,7 +2,7 @@
 // para buscar insights de campanhas. PENDENTE de validação com credenciais
 // reais (token de longa duração + ad account) — ainda não exercitado em runtime.
 
-import { getMetaConfig } from "@/lib/meta-config";
+import { getMetaAdsConfig } from "@/lib/meta-ads-config";
 
 const GRAPH_VERSION = "v21.0";
 
@@ -46,9 +46,24 @@ interface MetaCampaign {
 }
 
 async function token(): Promise<string> {
-  const { accessToken } = await getMetaConfig();
-  if (!accessToken) throw new Error("Access token da Meta não configurado");
+  const { accessToken } = await getMetaAdsConfig();
+  if (!accessToken) throw new Error("Access token de anúncios da Meta não configurado");
   return accessToken;
+}
+
+/** Testa a conexão de anúncios: busca o nome da conta de anúncios. */
+export async function testMetaAdsConnection(): Promise<{ accountName: string }> {
+  const { accessToken, adAccountId } = await getMetaAdsConfig();
+  if (!accessToken || !adAccountId) throw new Error("Credenciais de anúncios incompletas");
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/act_${adAccountId}?fields=name&access_token=${accessToken}`
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Meta Ads teste falhou [${res.status}]: ${body}`);
+  }
+  const json = (await res.json()) as { name?: string };
+  return { accountName: json.name ?? "(sem nome)" };
 }
 
 function num(v: string | undefined): number {

@@ -1,28 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Facebook, CheckCircle2, AlertCircle, Plug, RefreshCw } from "lucide-react";
+import { Megaphone, CheckCircle2, AlertCircle, Plug, RefreshCw } from "lucide-react";
 
-interface MetaStatus {
-  appId: boolean;
-  appSecret: boolean;
-  accessToken: boolean;
-  pageId: string | null;
-  igId: string | null;
-  verifyToken: boolean;
+interface MetaAdsStatus {
+  accessToken: boolean; // tem token (próprio ou herdado da mensageria)
+  ownToken: boolean; // tem token próprio de anúncios
+  adAccountId: string | null;
 }
 
-const EMPTY_FORM = {
-  app_id: "",
-  app_secret: "",
-  access_token: "",
-  page_id: "",
-  ig_id: "",
-  verify_token: "",
-};
+const EMPTY_FORM = { access_token: "", ad_account_id: "" };
 
-export function MetaCard() {
-  const [status, setStatus] = useState<MetaStatus | null>(null);
+export function MetaAdsCard() {
+  const [status, setStatus] = useState<MetaAdsStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
@@ -32,8 +22,8 @@ export function MetaCard() {
   const fetchStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/integrations/meta/config");
-      if (res.ok) setStatus((await res.json()).data as MetaStatus);
+      const res = await fetch("/api/v1/integrations/meta-ads/config");
+      if (res.ok) setStatus((await res.json()).data as MetaAdsStatus);
     } finally {
       setLoading(false);
     }
@@ -43,25 +33,24 @@ export function MetaCard() {
     void fetchStatus();
   }, [fetchStatus]);
 
-  const configured = Boolean(status?.accessToken && status?.pageId);
+  const configured = Boolean(status?.accessToken && status?.adAccountId);
 
   const save = useCallback(async () => {
     setWorking(true);
     setMessage(null);
     try {
-      // Envia só os campos preenchidos (segredos em branco mantêm o atual).
       const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v.trim()));
-      const res = await fetch("/api/v1/integrations/meta/config", {
+      const res = await fetch("/api/v1/integrations/meta-ads/config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (res.ok) {
-        setStatus(json.data as MetaStatus);
+        setStatus(json.data as MetaAdsStatus);
         setEditing(false);
         setForm({ ...EMPTY_FORM });
-        setMessage({ kind: "ok", text: "Credenciais salvas." });
+        setMessage({ kind: "ok", text: "Configuração salva." });
       } else {
         setMessage({ kind: "err", text: json.error?.message ?? "Falha ao salvar" });
       }
@@ -74,11 +63,11 @@ export function MetaCard() {
     setWorking(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/v1/integrations/meta/test", { method: "POST" });
+      const res = await fetch("/api/v1/integrations/meta-ads/test", { method: "POST" });
       const json = await res.json();
       setMessage(
         res.ok
-          ? { kind: "ok", text: `Conexão OK — página: ${json.data.pageName}` }
+          ? { kind: "ok", text: `Conexão OK — conta: ${json.data.accountName}` }
           : { kind: "err", text: json.error?.message ?? "Falha na conexão" }
       );
     } finally {
@@ -86,28 +75,15 @@ export function MetaCard() {
     }
   }, []);
 
-  const field = (key: keyof typeof form, label: string, placeholder: string, secret = false) => (
-    <label className="flex flex-col gap-1">
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-      <input
-        type={secret ? "password" : "text"}
-        value={form[key]}
-        onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-        placeholder={placeholder}
-        className="text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
-      />
-    </label>
-  );
-
   return (
     <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4">
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-          <Facebook className="w-5 h-5 text-blue-600" />
+          <Megaphone className="w-5 h-5 text-blue-600" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground">Meta — Mensageria</p>
-          <p className="text-xs text-muted-foreground">Instagram Direct/Comentários e Facebook Messenger</p>
+          <p className="text-sm font-semibold text-foreground">Meta — Anúncios</p>
+          <p className="text-xs text-muted-foreground">Métricas de campanhas (Marketing API)</p>
         </div>
       </div>
 
@@ -118,7 +94,7 @@ export function MetaCard() {
           <>
             <CheckCircle2 className="w-4 h-4 text-green-600" />
             <span className="text-sm font-medium text-green-600">Configurado</span>
-            {status?.pageId && <span className="text-xs text-muted-foreground">· página {status.pageId}</span>}
+            {status?.adAccountId && <span className="text-xs text-muted-foreground">· conta {status.adAccountId}</span>}
           </>
         ) : (
           <>
@@ -142,12 +118,25 @@ export function MetaCard() {
 
       {editing ? (
         <div className="flex flex-col gap-2">
-          {field("app_id", "App ID", status?.appId ? "•••• (preenchido)" : "App ID")}
-          {field("app_secret", "App Secret", status?.appSecret ? "•••• (mantém se vazio)" : "App Secret", true)}
-          {field("access_token", "Access Token", status?.accessToken ? "•••• (mantém se vazio)" : "Token de acesso", true)}
-          {field("page_id", "Page ID", status?.pageId ?? "Page ID")}
-          {field("ig_id", "Instagram ID (opcional)", status?.igId ?? "ID da conta IG")}
-          {field("verify_token", "Verify Token (webhook)", status?.verifyToken ? "•••• (mantém se vazio)" : "Token de verificação", true)}
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] text-muted-foreground">Ad Account ID</span>
+            <input
+              value={form.ad_account_id}
+              onChange={(e) => setForm((f) => ({ ...f, ad_account_id: e.target.value }))}
+              placeholder={status?.adAccountId ?? "ID da conta de anúncios (sem 'act_')"}
+              className="text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] text-muted-foreground">Access Token (opcional)</span>
+            <input
+              type="password"
+              value={form.access_token}
+              onChange={(e) => setForm((f) => ({ ...f, access_token: e.target.value }))}
+              placeholder={status?.ownToken ? "•••• (mantém se vazio)" : "Vazio = usa o token da Mensageria"}
+              className="text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </label>
           <div className="flex items-center gap-2 mt-1">
             <button
               onClick={() => void save()}
@@ -167,7 +156,7 @@ export function MetaCard() {
             </button>
           </div>
           <p className="text-[10px] text-muted-foreground">
-            Segredos são guardados criptografados. Deixe um campo de segredo vazio para manter o valor atual.
+            Deixe o token vazio para reaproveitar o da Mensageria (se ele tiver permissão de anúncios).
           </p>
         </div>
       ) : (
@@ -177,7 +166,7 @@ export function MetaCard() {
             className="flex items-center gap-1.5 text-xs bg-primary text-primary-foreground rounded-md px-3 py-2 hover:opacity-90"
           >
             <Plug className="w-3.5 h-3.5" />
-            {configured ? "Atualizar credenciais" : "Configurar"}
+            {configured ? "Atualizar" : "Configurar"}
           </button>
           {configured && (
             <button

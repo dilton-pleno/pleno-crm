@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
-import { getMetaStatus, saveMetaConfig } from "@/lib/meta-config";
+import { getMetaAdsStatus, saveMetaAdsConfig } from "@/lib/meta-ads-config";
 
 export async function GET(): Promise<NextResponse> {
   const guard = await requireAccess("integracoes", "full");
   if (!guard.ok) return guard.response;
-  return NextResponse.json({ data: await getMetaStatus() });
+  return NextResponse.json({ data: await getMetaAdsStatus() });
 }
 
 const schema = z.object({
-  app_id: z.string().optional(),
-  app_secret: z.string().optional(),
   access_token: z.string().optional(),
-  page_id: z.string().optional(),
-  ig_id: z.string().optional(),
-  verify_token: z.string().optional(),
+  ad_account_id: z.string().optional(),
 });
 
 export async function PUT(request: NextRequest): Promise<NextResponse> {
@@ -30,14 +26,10 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  await saveMetaConfig({
-    appId: parsed.data.app_id,
-    appSecret: parsed.data.app_secret,
+  await saveMetaAdsConfig({
     accessToken: parsed.data.access_token,
-    pageId: parsed.data.page_id,
-    igId: parsed.data.ig_id,
-    verifyToken: parsed.data.verify_token,
+    adAccountId: parsed.data.ad_account_id,
   });
 
-  return NextResponse.json({ data: await getMetaStatus() });
+  return NextResponse.json({ data: await getMetaAdsStatus() });
 }
