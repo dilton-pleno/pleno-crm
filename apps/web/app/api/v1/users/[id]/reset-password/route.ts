@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { hash } from "bcryptjs";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { generatePassword } from "@/lib/password";
+import { isPasswordValid } from "@/lib/password";
+
+const schema = z.object({
+  password: z
+    .string()
+    .refine(isPasswordValid, "A senha deve ter 8+ caracteres com maiúscula, minúscula, número e símbolo"),
+});
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const guard = await requireAccess("configuracoes", "full");
@@ -21,11 +28,16 @@ export async function POST(
     );
   }
 
-  const password = generatePassword(12);
-  const passwordHash = await hash(password, 12);
+  const parsed = schema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: parsed.error.message } },
+      { status: 422 }
+    );
+  }
 
+  const passwordHash = await hash(parsed.data.password, 12);
   await prisma.user.update({ where: { id }, data: { passwordHash } });
 
-  // A senha em texto claro é retornada uma única vez para o admin copiar.
-  return NextResponse.json({ data: { id, password } });
+  return NextResponse.json({ data: { id } });
 }
