@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, X, QrCode, MessageCircle, CheckCircle2, AlertCircle, History } from "lucide-react";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { WbuyCard } from "./wbuy-card";
+import { MetaCard } from "./meta-card";
 
 interface HistoryImport {
   status: "running" | "done" | "error";
@@ -283,7 +284,8 @@ export function IntegracoesClient({ currentUserId, canManage, isAdmin }: Props) 
         )}
       </div>
 
-      {/* Card Wbuy (e-commerce) — gestão de credenciais só para Admin */}
+      {/* Cards de integração — gestão de credenciais só para Admin */}
+      {isAdmin && <MetaCard />}
       {isAdmin && <WbuyCard />}
 
       {showModal && (

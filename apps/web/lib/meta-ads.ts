@@ -2,6 +2,8 @@
 // para buscar insights de campanhas. PENDENTE de validação com credenciais
 // reais (token de longa duração + ad account) — ainda não exercitado em runtime.
 
+import { getMetaConfig } from "@/lib/meta-config";
+
 const GRAPH_VERSION = "v21.0";
 
 export interface DateRange {
@@ -43,10 +45,10 @@ interface MetaCampaign {
   insights?: { data?: MetaInsight[] };
 }
 
-function token(): string {
-  const t = process.env.META_ACCESS_TOKEN;
-  if (!t) throw new Error("META_ACCESS_TOKEN não configurada");
-  return t;
+async function token(): Promise<string> {
+  const { accessToken } = await getMetaConfig();
+  if (!accessToken) throw new Error("Access token da Meta não configurado");
+  return accessToken;
 }
 
 function num(v: string | undefined): number {
@@ -68,7 +70,7 @@ export async function getCampaignInsights(
     `{impressions,reach,clicks,spend,cpm,ctr,actions,action_values}`;
   const url =
     `https://graph.facebook.com/${GRAPH_VERSION}/act_${accountId}/campaigns` +
-    `?fields=${fields}&access_token=${token()}`;
+    `?fields=${fields}&access_token=${await token()}`;
 
   const res = await fetch(url);
   if (!res.ok) {
