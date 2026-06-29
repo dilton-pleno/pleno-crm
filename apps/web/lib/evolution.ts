@@ -340,3 +340,58 @@ export async function sendMedia(
 
   return res.json() as Promise<EvolutionResponse>;
 }
+
+// Tipo de mídia aceito pelo sendMedia da Evolution (áudio tem endpoint próprio).
+type SendableMediaType = "image" | "video" | "document";
+
+/**
+ * Envia mídia a partir dos bytes (base64 puro, sem prefixo data-uri). Usado no
+ * upload de arquivos do compositor. Áudio NÃO entra aqui — use sendWhatsAppAudio.
+ */
+export async function sendMediaBase64(
+  instanceName: string,
+  to: string,
+  params: { base64: string; mimetype: string; fileName: string; caption?: string; mediatype: SendableMediaType }
+): Promise<EvolutionResponse> {
+  const res = await fetch(`${baseUrl()}/message/sendMedia/${instanceName}`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      number: to,
+      mediatype: params.mediatype,
+      mimetype: params.mimetype,
+      media: params.base64,
+      fileName: params.fileName,
+      caption: params.caption ?? "",
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Evolution sendMedia falhou [${res.status}]: ${body}`);
+  }
+
+  return res.json() as Promise<EvolutionResponse>;
+}
+
+/**
+ * Envia áudio (PTT) a partir dos bytes em base64 via POST /message/sendWhatsAppAudio.
+ */
+export async function sendWhatsAppAudio(
+  instanceName: string,
+  to: string,
+  base64: string
+): Promise<EvolutionResponse> {
+  const res = await fetch(`${baseUrl()}/message/sendWhatsAppAudio/${instanceName}`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ number: to, audio: base64 }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Evolution sendWhatsAppAudio falhou [${res.status}]: ${body}`);
+  }
+
+  return res.json() as Promise<EvolutionResponse>;
+}
