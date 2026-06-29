@@ -126,13 +126,98 @@ async function executeAction(action: AutomationAction, ctx: TriggerContext): Pro
       });
       return;
     }
-    // move_kanban, webhook, wait, schedule → Fase 3 (ignorados silenciosamente).
+    case "move_kanban": {
+      const stageId = typeof cfg.stage_id === "string" ? cfg.stage_id : "";
+      if (!stageId || !ctx.conversationId) return;
+      const card = await prisma.pipelineCard.findFirst({
+        where: { conversationId: ctx.conversationId },
+        select: { id: true },
+      });
+      if (!card) return;
+      await prisma.pipelineCard.update({ where: { id: card.id }, data: { stageId } });
+      return;
+    }
+    case "webhook": {
+      const url = typeof cfg.url === "string" ? cfg.url.trim() : "";
+      if (!url) return;
+      const method = (typeof cfg.method === "string" ? cfg.method : "POST").toUpperCase();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      try {
+        await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: method === "GET" ? undefined : JSON.stringify({
+            trigger: ctx.trigger,
+            conversationId: ctx.conversationId,
+            contactId: ctx.contactId,
+            inboxId: ctx.inboxId,
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+      return;
+    }
+    // wait é tratado em runActions (não chega aqui).
     default:
       return;
   }
 }
 
+interface StoredContext {
+  trigger: AutomationTrigger;
+  conversationId?: string | null;
+  contactId?: string | null;
+  inboxId?: string | null;
+  channelType?: string | null;
+  messageContent?: string | null;
+}
+
+// Executa as ações a partir de `startIndex`. Em `wait`, persiste o run como
+// "waiting" com `resumeAt` e para — retomado depois pelo cron.
+async function runActions(
+  actions: AutomationAction[],
+  ctx: TriggerContext,
+  runId: string,
+  startIndex: number
+): Promise<void> {
+  for (let i = startIndex; i < actions.length; i++) {
+    const action = actions[i]!;
+    if (action.actionType === "wait") {
+      const cfg = (action.actionConfig ?? {}) as Record<string, unknown>;
+      const minutes = Math.max(0, Number(cfg.minutes) || 0);
+      const resumeAt = new Date(Date.now() + minutes * 60_000);
+      await prisma.automationRun.update({
+        where: { id: runId },
+        data: { status: "waiting", currentPosition: i + 1, resumeAt },
+      });
+      return;
+    }
+    try {
+      await executeAction(action, ctx);
+    } catch (err) {
+      await prisma.automationRun.update({
+        where: { id: runId },
+        data: { status: "error", error: err instanceof Error ? err.message : String(err) },
+      });
+      return;
+    }
+    await prisma.automationRun.update({ where: { id: runId }, data: { currentPosition: i + 1 } });
+  }
+  await prisma.automationRun.update({ where: { id: runId }, data: { status: "done", resumeAt: null } });
+}
+
 async function executeAutomation(a: AutomationWithActions, ctx: TriggerContext): Promise<void> {
+  const storedContext: StoredContext = {
+    trigger: ctx.trigger,
+    conversationId: ctx.conversationId ?? null,
+    contactId: ctx.contactId ?? null,
+    inboxId: ctx.inboxId ?? null,
+    channelType: ctx.channelType ?? null,
+    messageContent: ctx.messageContent ?? null,
+  };
   const run = await prisma.automationRun.create({
     data: {
       automationId: a.id,
@@ -140,24 +225,92 @@ async function executeAutomation(a: AutomationWithActions, ctx: TriggerContext):
       contactId: ctx.contactId ?? null,
       trigger: ctx.trigger,
       status: "running",
+      context: storedContext as unknown as object,
     },
   });
+  await runActions(a.actions, ctx, run.id, 0);
+}
 
-  try {
-    for (const action of a.actions) {
-      await executeAction(action, ctx);
+/**
+ * Retoma runs em espera (`wait`) cujo `resumeAt` já passou. Chamado pelo cron
+ * (N8N) em `/api/internal/automations/resume`. Recarrega as ações da automação.
+ */
+export async function resumeDueRuns(limit = 50): Promise<{ resumed: number }> {
+  const due = await prisma.automationRun.findMany({
+    where: { status: "waiting", resumeAt: { lte: new Date() } },
+    orderBy: { resumeAt: "asc" },
+    take: limit,
+    include: { automation: { include: { actions: { orderBy: { position: "asc" } } } } },
+  });
+
+  let resumed = 0;
+  for (const run of due) {
+    try {
+      const stored = (run.context ?? {}) as unknown as StoredContext;
+      const ctx: TriggerContext = {
+        trigger: (stored.trigger ?? "schedule") as AutomationTrigger,
+        conversationId: stored.conversationId ?? null,
+        contactId: stored.contactId ?? null,
+        inboxId: stored.inboxId ?? null,
+        channelType: stored.channelType ?? null,
+        messageContent: stored.messageContent ?? null,
+      };
+      await prisma.automationRun.update({ where: { id: run.id }, data: { status: "running" } });
+      await runActions(run.automation.actions, ctx, run.id, run.currentPosition);
+      resumed++;
+    } catch (err) {
       await prisma.automationRun.update({
         where: { id: run.id },
-        data: { currentPosition: action.position },
+        data: { status: "error", error: err instanceof Error ? err.message : String(err) },
       });
     }
-    await prisma.automationRun.update({ where: { id: run.id }, data: { status: "done" } });
-  } catch (err) {
-    await prisma.automationRun.update({
-      where: { id: run.id },
-      data: { status: "error", error: err instanceof Error ? err.message : String(err) },
-    });
   }
+  return { resumed };
+}
+
+/**
+ * Executa automações com gatilho `schedule`. Chamado pelo cron (N8N) em
+ * `/api/internal/automations/run-scheduled`. Dispara uma vez por dia, a partir
+ * do horário configurado (triggerConfig.time "HH:mm", days opcional), com dedup
+ * por dia via AutomationRun. Sem conversa/contato (ações de alvo são no-op).
+ */
+export async function runScheduledAutomations(): Promise<{ triggered: number }> {
+  const automations = await prisma.automation.findMany({
+    where: { active: true, triggerType: "schedule" },
+    include: { actions: { orderBy: { position: "asc" } } },
+  });
+
+  const { minutes: nowMin, day } = nowSaoPaulo();
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  let triggered = 0;
+  for (const a of automations) {
+    try {
+      const cfg = (a.triggerConfig ?? {}) as TriggerConfig & { time?: string };
+      const time = typeof cfg.time === "string" ? cfg.time : null;
+      if (!time) continue;
+      if (nowMin < parseHHMM(time)) continue;
+      if (cfg.hours?.days && cfg.hours.days.length && !cfg.hours.days.includes(day)) continue;
+
+      const alreadyToday = await prisma.automationRun.findFirst({
+        where: { automationId: a.id, createdAt: { gte: startOfToday }, status: { in: ["done", "running", "waiting"] } },
+        select: { id: true },
+      });
+      if (alreadyToday) continue;
+
+      await executeAutomation(a, {
+        trigger: "schedule",
+        conversationId: null,
+        contactId: null,
+        inboxId: (cfg.inboxId as string) ?? null,
+      });
+      triggered++;
+    } catch (err) {
+      console.error(`[automation] erro no schedule ${a.id}:`, err);
+    }
+  }
+  return { triggered };
 }
 
 /**

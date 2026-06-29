@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowLeft, Plus, Trash2, Pencil, Zap, Power, ChevronUp, ChevronDown,
   MessageSquare, Tag as TagIcon, UserPlus, ListChecks, History,
+  LayoutGrid, Webhook, Clock,
 } from "lucide-react";
 
 const INPUT = "text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring";
@@ -27,6 +28,7 @@ interface Props {
   inboxes: Option[];
   agents: Option[];
   tags: string[];
+  stages: Option[];
   isAdmin: boolean;
 }
 
@@ -35,6 +37,7 @@ const TRIGGER_LABELS: Record<string, string> = {
   keyword: "Palavra-chave",
   new_contact: "Novo contato",
   conversation_opened: "Conversa aberta",
+  schedule: "Agendado",
 };
 const TRIGGERS = Object.keys(TRIGGER_LABELS);
 
@@ -42,6 +45,9 @@ const ACTION_LABELS: Record<string, string> = {
   send_message: "Enviar mensagem",
   add_tag: "Adicionar etiqueta",
   assign_agent: "Atribuir agente",
+  move_kanban: "Mover no Kanban",
+  webhook: "Webhook",
+  wait: "Aguardar",
 };
 const ACTION_TYPES = Object.keys(ACTION_LABELS);
 
@@ -49,6 +55,9 @@ const ACTION_ICON: Record<string, React.ElementType> = {
   send_message: MessageSquare,
   add_tag: TagIcon,
   assign_agent: UserPlus,
+  move_kanban: LayoutGrid,
+  webhook: Webhook,
+  wait: Clock,
 };
 
 const STATUS_STYLE: Record<string, string> = {
@@ -77,6 +86,7 @@ interface BuilderState {
   hoursStart: string;
   hoursEnd: string;
   hoursOutside: boolean;
+  schedTime: string;
   active: boolean;
   actions: BuilderAction[];
 }
@@ -85,7 +95,7 @@ function blankBuilder(): BuilderState {
   return {
     name: "", trigger_type: "new_contact", channel: "all", inboxId: "", keyword: "",
     oncePerContact: false, useHours: false, hoursStart: "08:00", hoursEnd: "18:00",
-    hoursOutside: false, active: false, actions: [],
+    hoursOutside: false, schedTime: "09:00", active: false, actions: [],
   };
 }
 
@@ -103,6 +113,7 @@ function fromAutomation(a: AutomationDetail): BuilderState {
     hoursStart: hours?.start || "08:00",
     hoursEnd: hours?.end || "18:00",
     hoursOutside: Boolean(hours?.outside),
+    schedTime: (c.time as string) || "09:00",
     active: a.active,
     actions: a.actions.map((ac) => ({
       action_type: ac.action_type,
@@ -110,6 +121,10 @@ function fromAutomation(a: AutomationDetail): BuilderState {
         message: String(ac.action_config.message ?? ""),
         tag: String(ac.action_config.tag ?? ""),
         user_id: String(ac.action_config.user_id ?? ""),
+        stage_id: String(ac.action_config.stage_id ?? ""),
+        url: String(ac.action_config.url ?? ""),
+        method: String(ac.action_config.method ?? "POST"),
+        minutes: String(ac.action_config.minutes ?? "5"),
       },
     })),
   };
@@ -117,24 +132,31 @@ function fromAutomation(a: AutomationDetail): BuilderState {
 
 function toPayload(s: BuilderState) {
   const trigger_config: Record<string, unknown> = {};
-  if (s.channel !== "all") trigger_config.channel = s.channel;
-  if (s.inboxId) trigger_config.inboxId = s.inboxId;
-  if (s.trigger_type === "keyword" && s.keyword.trim()) trigger_config.keyword = s.keyword.trim();
-  if (s.oncePerContact) trigger_config.oncePerContact = true;
-  if (s.useHours) trigger_config.hours = { start: s.hoursStart, end: s.hoursEnd, outside: s.hoursOutside };
+  if (s.trigger_type === "schedule") {
+    trigger_config.time = s.schedTime;
+  } else {
+    if (s.channel !== "all") trigger_config.channel = s.channel;
+    if (s.inboxId) trigger_config.inboxId = s.inboxId;
+    if (s.trigger_type === "keyword" && s.keyword.trim()) trigger_config.keyword = s.keyword.trim();
+    if (s.oncePerContact) trigger_config.oncePerContact = true;
+    if (s.useHours) trigger_config.hours = { start: s.hoursStart, end: s.hoursEnd, outside: s.hoursOutside };
+  }
 
   const actions = s.actions.map((a, i) => {
     const cfg: Record<string, unknown> = {};
     if (a.action_type === "send_message") cfg.message = a.config.message ?? "";
     else if (a.action_type === "add_tag") cfg.tag = a.config.tag ?? "";
     else if (a.action_type === "assign_agent") cfg.user_id = a.config.user_id ?? "";
+    else if (a.action_type === "move_kanban") cfg.stage_id = a.config.stage_id ?? "";
+    else if (a.action_type === "webhook") { cfg.url = a.config.url ?? ""; cfg.method = a.config.method ?? "POST"; }
+    else if (a.action_type === "wait") cfg.minutes = Math.max(0, Number(a.config.minutes) || 0);
     return { position: i + 1, action_type: a.action_type, action_config: cfg };
   });
 
   return { name: s.name.trim(), trigger_type: s.trigger_type, trigger_config, active: s.active, actions };
 }
 
-export function AutomacoesClient({ initialAutomations, inboxes, agents, tags, isAdmin }: Props) {
+export function AutomacoesClient({ initialAutomations, inboxes, agents, tags, stages, isAdmin }: Props) {
   const [automations, setAutomations] = useState<AutomationDetail[]>(initialAutomations);
   const [tab, setTab] = useState<"automacoes" | "execucoes">("automacoes");
   const [editing, setEditing] = useState<{ id: string | null; state: BuilderState } | null>(null);
@@ -180,6 +202,7 @@ export function AutomacoesClient({ initialAutomations, inboxes, agents, tags, is
         inboxes={inboxes}
         agents={agents}
         tags={tags}
+        stages={stages}
         error={error}
         onCancel={() => { setEditing(null); setError(null); }}
         onSave={(state) => void save(editing.id, state)}
@@ -271,9 +294,9 @@ function TabBtn({ active, onClick, icon: Icon, children }: { active: boolean; on
 
 // ---- Builder ----
 function AutomationBuilder({
-  initial, isNew, inboxes, agents, tags, error, onCancel, onSave,
+  initial, isNew, inboxes, agents, tags, stages, error, onCancel, onSave,
 }: {
-  initial: BuilderState; isNew: boolean; inboxes: Option[]; agents: Option[]; tags: string[];
+  initial: BuilderState; isNew: boolean; inboxes: Option[]; agents: Option[]; tags: string[]; stages: Option[];
   error: string | null; onCancel: () => void; onSave: (s: BuilderState) => void;
 }) {
   const [s, setS] = useState<BuilderState>(initial);
@@ -292,7 +315,8 @@ function AutomationBuilder({
     set({ actions: s.actions.map((a, idx) => (idx === i ? { ...a, config: { ...a.config, [key]: value } } : a)) });
 
   const valid = s.name.trim() && s.actions.length > 0 &&
-    (s.trigger_type !== "keyword" || s.keyword.trim());
+    (s.trigger_type !== "keyword" || s.keyword.trim()) &&
+    (s.trigger_type !== "schedule" || Boolean(s.schedTime));
 
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-5 max-w-2xl mx-auto w-full">
@@ -314,47 +338,56 @@ function AutomationBuilder({
           <input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Ex.: Boas-vindas WhatsApp"
             className={INPUT} />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Quando">
-            <select value={s.trigger_type} onChange={(e) => set({ trigger_type: e.target.value })} className={INPUT}>
-              {TRIGGERS.map((t) => <option key={t} value={t}>{TRIGGER_LABELS[t]}</option>)}
-            </select>
-          </Field>
-          <Field label="Plataforma">
-            <select value={s.channel} onChange={(e) => set({ channel: e.target.value })} className={INPUT}>
-              {CHANNELS.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </Field>
-        </div>
-        <Field label="Canal (Inbox)">
-          <select value={s.inboxId} onChange={(e) => set({ inboxId: e.target.value })} className={INPUT}>
-            <option value="">Todos os canais</option>
-            {inboxes.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+        <Field label="Quando">
+          <select value={s.trigger_type} onChange={(e) => set({ trigger_type: e.target.value })} className={INPUT}>
+            {TRIGGERS.map((t) => <option key={t} value={t}>{TRIGGER_LABELS[t]}</option>)}
           </select>
         </Field>
-        {s.trigger_type === "keyword" && (
-          <Field label="Palavra-chave (a mensagem deve conter)">
-            <input value={s.keyword} onChange={(e) => set({ keyword: e.target.value })} placeholder="ex.: orçamento" className={INPUT} />
+
+        {s.trigger_type === "schedule" ? (
+          <Field label="Horário (diário · America/São_Paulo)">
+            <input type="time" value={s.schedTime} onChange={(e) => set({ schedTime: e.target.value })} className={`${INPUT} w-32`} />
           </Field>
-        )}
-        <label className="flex items-center gap-2 text-xs text-foreground">
-          <input type="checkbox" checked={s.oncePerContact} onChange={(e) => set({ oncePerContact: e.target.checked })} />
-          Disparar apenas uma vez por contato
-        </label>
-        <label className="flex items-center gap-2 text-xs text-foreground">
-          <input type="checkbox" checked={s.useHours} onChange={(e) => set({ useHours: e.target.checked })} />
-          Restringir por horário (America/São_Paulo)
-        </label>
-        {s.useHours && (
-          <div className="flex items-center gap-2 flex-wrap pl-6">
-            <input type="time" value={s.hoursStart} onChange={(e) => set({ hoursStart: e.target.value })} className={`${INPUT} w-28`} />
-            <span className="text-xs text-muted-foreground">até</span>
-            <input type="time" value={s.hoursEnd} onChange={(e) => set({ hoursEnd: e.target.value })} className={`${INPUT} w-28`} />
-            <label className="flex items-center gap-1.5 text-xs text-foreground ml-2">
-              <input type="checkbox" checked={s.hoursOutside} onChange={(e) => set({ hoursOutside: e.target.checked })} />
-              apenas FORA desse horário
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Plataforma">
+                <select value={s.channel} onChange={(e) => set({ channel: e.target.value })} className={INPUT}>
+                  {CHANNELS.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Canal (Inbox)">
+                <select value={s.inboxId} onChange={(e) => set({ inboxId: e.target.value })} className={INPUT}>
+                  <option value="">Todos os canais</option>
+                  {inboxes.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                </select>
+              </Field>
+            </div>
+            {s.trigger_type === "keyword" && (
+              <Field label="Palavra-chave (a mensagem deve conter)">
+                <input value={s.keyword} onChange={(e) => set({ keyword: e.target.value })} placeholder="ex.: orçamento" className={INPUT} />
+              </Field>
+            )}
+            <label className="flex items-center gap-2 text-xs text-foreground">
+              <input type="checkbox" checked={s.oncePerContact} onChange={(e) => set({ oncePerContact: e.target.checked })} />
+              Disparar apenas uma vez por contato
             </label>
-          </div>
+            <label className="flex items-center gap-2 text-xs text-foreground">
+              <input type="checkbox" checked={s.useHours} onChange={(e) => set({ useHours: e.target.checked })} />
+              Restringir por horário (America/São_Paulo)
+            </label>
+            {s.useHours && (
+              <div className="flex items-center gap-2 flex-wrap pl-6">
+                <input type="time" value={s.hoursStart} onChange={(e) => set({ hoursStart: e.target.value })} className={`${INPUT} w-28`} />
+                <span className="text-xs text-muted-foreground">até</span>
+                <input type="time" value={s.hoursEnd} onChange={(e) => set({ hoursEnd: e.target.value })} className={`${INPUT} w-28`} />
+                <label className="flex items-center gap-1.5 text-xs text-foreground ml-2">
+                  <input type="checkbox" checked={s.hoursOutside} onChange={(e) => set({ hoursOutside: e.target.checked })} />
+                  apenas FORA desse horário
+                </label>
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -389,6 +422,29 @@ function AutomationBuilder({
                   <option value="">Selecione o agente…</option>
                   {agents.map((ag) => <option key={ag.id} value={ag.id}>{ag.name}</option>)}
                 </select>
+              )}
+              {a.action_type === "move_kanban" && (
+                <select value={a.config.stage_id ?? ""} onChange={(e) => setActionConfig(i, "stage_id", e.target.value)} className={INPUT}>
+                  <option value="">Selecione o estágio…</option>
+                  {stages.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+                </select>
+              )}
+              {a.action_type === "webhook" && (
+                <div className="flex items-center gap-2">
+                  <select value={a.config.method ?? "POST"} onChange={(e) => setActionConfig(i, "method", e.target.value)} className={`${INPUT} w-28`}>
+                    <option value="POST">POST</option>
+                    <option value="GET">GET</option>
+                  </select>
+                  <input value={a.config.url ?? ""} onChange={(e) => setActionConfig(i, "url", e.target.value)}
+                    placeholder="https://…" className={`${INPUT} flex-1`} />
+                </div>
+              )}
+              {a.action_type === "wait" && (
+                <div className="flex items-center gap-2">
+                  <input type="number" min={0} value={a.config.minutes ?? "5"} onChange={(e) => setActionConfig(i, "minutes", e.target.value)}
+                    className={`${INPUT} w-24`} />
+                  <span className="text-xs text-muted-foreground">minutos antes da próxima ação</span>
+                </div>
               )}
             </div>
           );

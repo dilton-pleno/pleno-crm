@@ -13,7 +13,7 @@ export default async function AutomacoesPage() {
   if (!canAccess(role, "automacoes")) redirect("/atendimento");
   const isAdmin = role === "ADMIN";
 
-  const [automations, inboxes, agents, tags] = await Promise.all([
+  const [automations, inboxes, agents, tags, pipelines] = await Promise.all([
     prisma.automation.findMany({
       orderBy: { createdAt: "asc" },
       include: {
@@ -25,7 +25,16 @@ export default async function AutomacoesPage() {
     prisma.inbox.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { createdAt: "asc" } }),
     prisma.user.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.tag.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.pipeline.findMany({
+      orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+      select: { name: true, stages: { orderBy: { position: "asc" }, select: { id: true, name: true } } },
+    }),
   ]);
+
+  // Estágios achatados ("Pipeline › Estágio") para a ação Mover no Kanban.
+  const stages: Option[] = pipelines.flatMap((p) =>
+    p.stages.map((s) => ({ id: s.id, name: `${p.name} › ${s.name}` }))
+  );
 
   const initial: AutomationDetail[] = automations.map((a) => {
     const last = a.runs[0];
@@ -50,6 +59,7 @@ export default async function AutomacoesPage() {
       inboxes={inboxes.map((i) => ({ id: i.id, name: i.name }) as Option)}
       agents={agents.map((a) => ({ id: a.id, name: a.name }) as Option)}
       tags={tags.map((t) => t.name)}
+      stages={stages}
       isAdmin={isAdmin}
     />
   );
