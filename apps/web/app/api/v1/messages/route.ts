@@ -75,9 +75,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
       }
       if (channelType === "instagram") {
-        await sendInstagramDirect(to, content);
+        await sendInstagramDirect(to, content, conversation.inboxId);
       } else {
-        await sendMessengerMessage(to, content);
+        await sendMessengerMessage(to, content, conversation.inboxId);
       }
     } else {
       return NextResponse.json(

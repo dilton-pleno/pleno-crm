@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { SlidersHorizontal, Zap, Users, Plug, ChevronRight, Tag, MessageSquareText } from "lucide-react";
+import { SlidersHorizontal, Zap, Users, Plug, ChevronRight, Tag, MessageSquareText, Radio } from "lucide-react";
 
 export default async function ConfiguracoesPage() {
   const session = await auth();
@@ -14,6 +14,12 @@ export default async function ConfiguracoesPage() {
       icon: Users,
       title: "Usuários",
       description: "Gerenciar usuários, papéis e acesso",
+    },
+    {
+      href: "/configuracoes/canais",
+      icon: Radio,
+      title: "Canais",
+      description: "Caixas de atendimento (WhatsApp + Instagram + Facebook) por setor",
     },
     {
       href: "/configuracoes/integracoes",

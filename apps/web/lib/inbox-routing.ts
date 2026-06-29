@@ -6,7 +6,7 @@
 import { prisma } from "@/lib/prisma";
 
 // "Canal Padrão" criado retroativamente na migração da Fase 1 (id fixo).
-const DEFAULT_INBOX_ID = "00000000-0000-0000-0000-000000000001";
+export const DEFAULT_INBOX_ID = "00000000-0000-0000-0000-000000000001";
 
 /** Id do Canal Padrão (id fixo da migração; fallback p/ o Canal mais antigo). */
 export async function getDefaultInboxId(): Promise<string | null> {

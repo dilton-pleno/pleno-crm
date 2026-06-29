@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { getMetaConfig } from "@/lib/meta-config";
+import { getMessagingConfig } from "@/lib/inbox-config";
 
 const GRAPH_VERSION = "v21.0";
 
@@ -7,14 +8,15 @@ function graphUrl(path: string): string {
   return `https://graph.facebook.com/${GRAPH_VERSION}/${path.replace(/^\//, "")}`;
 }
 
-async function requireToken(): Promise<string> {
-  const { accessToken } = await getMetaConfig();
+// Resolve token/page do Canal (inboxId) quando informado; senão, config global.
+async function requireToken(inboxId?: string | null): Promise<string> {
+  const { accessToken } = await getMessagingConfig(inboxId);
   if (!accessToken) throw new Error("Access token da Meta não configurado");
   return accessToken;
 }
 
-async function requirePageId(): Promise<string> {
-  const { pageId } = await getMetaConfig();
+async function requirePageId(inboxId?: string | null): Promise<string> {
+  const { pageId } = await getMessagingConfig(inboxId);
   if (!pageId) throw new Error("Page ID da Meta não configurado");
   return pageId;
 }
@@ -46,9 +48,9 @@ interface GraphProfile {
  * Resolve nome/avatar de um usuário (PSID) via Graph API.
  * Retorna null em qualquer falha para não bloquear a ingestão da mensagem.
  */
-export async function getUserProfile(psid: string): Promise<GraphProfile | null> {
+export async function getUserProfile(psid: string, inboxId?: string | null): Promise<GraphProfile | null> {
   try {
-    const token = await requireToken();
+    const token = await requireToken(inboxId);
     const res = await fetch(
       `${graphUrl(psid)}?fields=name,username,profile_pic&access_token=${token}`
     );
@@ -65,8 +67,8 @@ interface SendResponse {
   error?: { message: string };
 }
 
-async function sendViaGraph(recipientId: string, text: string): Promise<SendResponse> {
-  const [token, page] = [await requireToken(), await requirePageId()];
+async function sendViaGraph(recipientId: string, text: string, inboxId?: string | null): Promise<SendResponse> {
+  const [token, page] = [await requireToken(inboxId), await requirePageId(inboxId)];
   const res = await fetch(`${graphUrl(`${page}/messages`)}?access_token=${token}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -86,13 +88,13 @@ async function sendViaGraph(recipientId: string, text: string): Promise<SendResp
 }
 
 /** Envia mensagem de texto no Instagram Direct (recipientId = IG-scoped user id). */
-export function sendInstagramDirect(recipientId: string, text: string): Promise<SendResponse> {
-  return sendViaGraph(recipientId, text);
+export function sendInstagramDirect(recipientId: string, text: string, inboxId?: string | null): Promise<SendResponse> {
+  return sendViaGraph(recipientId, text, inboxId);
 }
 
 /** Envia mensagem de texto no Messenger (recipientId = PSID). */
-export function sendMessengerMessage(recipientId: string, text: string): Promise<SendResponse> {
-  return sendViaGraph(recipientId, text);
+export function sendMessengerMessage(recipientId: string, text: string, inboxId?: string | null): Promise<SendResponse> {
+  return sendViaGraph(recipientId, text, inboxId);
 }
 
 /**

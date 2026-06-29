@@ -91,7 +91,7 @@ async function handleMessaging(object: string, entryId: string, event: MetaMessa
     content = `↩️ Resposta ao Story: ${base}`.trim();
   }
 
-  const profile = await getUserProfile(senderId);
+  const profile = await getUserProfile(senderId, inboxId);
 
   await ingestInboundMessage({
     channelType,
