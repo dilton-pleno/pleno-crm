@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { canAccess } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
 import type { Role } from "@pleno-crm/types";
-import { Zap, ArrowLeft } from "lucide-react";
+import { AutomacoesClient, type AutomationDetail, type Option } from "./automacoes-client";
 
 export default async function AutomacoesPage() {
   const session = await auth();
@@ -11,31 +11,46 @@ export default async function AutomacoesPage() {
 
   const role = session.user.role as Role;
   if (!canAccess(role, "automacoes")) redirect("/atendimento");
+  const isAdmin = role === "ADMIN";
+
+  const [automations, inboxes, agents, tags] = await Promise.all([
+    prisma.automation.findMany({
+      orderBy: { createdAt: "asc" },
+      include: {
+        actions: { orderBy: { position: "asc" } },
+        _count: { select: { runs: true } },
+        runs: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true, createdAt: true } },
+      },
+    }),
+    prisma.inbox.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { createdAt: "asc" } }),
+    prisma.user.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.tag.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+  ]);
+
+  const initial: AutomationDetail[] = automations.map((a) => {
+    const last = a.runs[0];
+    return {
+      id: a.id,
+      name: a.name,
+      active: a.active,
+      trigger_type: a.triggerType,
+      trigger_config: (a.triggerConfig ?? {}) as Record<string, unknown>,
+      actions: a.actions.map((ac) => ({
+        action_type: ac.actionType,
+        action_config: (ac.actionConfig ?? {}) as Record<string, unknown>,
+      })),
+      run_count: a._count.runs,
+      last_run: last ? { status: last.status, created_at: last.createdAt.toISOString() } : null,
+    };
+  });
 
   return (
-    <div className="flex flex-col h-full overflow-auto p-6 gap-4 max-w-2xl mx-auto w-full">
-      <div className="flex items-center gap-2">
-        <Link href="/configuracoes" className="p-1.5 text-muted-foreground hover:bg-accent rounded-md">
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
-        <h1 className="text-lg font-semibold text-foreground">Automações</h1>
-      </div>
-
-      <div className="flex flex-col items-center justify-center gap-3 text-center py-20 bg-card border border-border rounded-lg">
-        <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-          <Zap className="w-7 h-7 text-primary" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <p className="text-base font-medium text-foreground">Em desenvolvimento</p>
-          <p className="text-sm text-muted-foreground max-w-sm">
-            O módulo de automações (fluxos automáticos de atendimento e campanhas)
-            está em desenvolvimento e estará disponível em breve.
-          </p>
-        </div>
-        <span className="text-[10px] font-medium uppercase tracking-wide text-primary bg-primary/10 rounded-full px-2.5 py-1">
-          Módulo 6
-        </span>
-      </div>
-    </div>
+    <AutomacoesClient
+      initialAutomations={initial}
+      inboxes={inboxes.map((i) => ({ id: i.id, name: i.name }) as Option)}
+      agents={agents.map((a) => ({ id: a.id, name: a.name }) as Option)}
+      tags={tags.map((t) => t.name)}
+      isAdmin={isAdmin}
+    />
   );
 }
