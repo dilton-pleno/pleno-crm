@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { canSeeInbox, userSeesInbox } from "@/lib/visibility";
 import { emitEvent } from "@/lib/websocket";
 
 const schema = z.object({
@@ -38,8 +39,18 @@ export async function PATCH(
   const { user_id } = parsed.data;
   const role = session.user.role;
 
-  // ADMIN e GESTOR podem atribuir a qualquer agente
-  // ATENDENTE só pode assumir conversa não atribuída (assignar para si mesmo)
+  // Visibilidade: quem não é ADMIN precisa enxergar o Canal da conversa.
+  if (role !== "ADMIN") {
+    const inboxId = conversation.inboxId;
+    if (!inboxId || !(await canSeeInbox(session.user, inboxId))) {
+      return NextResponse.json(
+        { error: { code: "FORBIDDEN", message: "Você não tem acesso a este canal" } },
+        { status: 403 }
+      );
+    }
+  }
+
+  // ADMIN e GESTOR podem atribuir a agentes; ATENDENTE só assume p/ si conversa livre.
   if (role === "ATENDENTE") {
     if (user_id !== session.user.id) {
       return NextResponse.json(
@@ -51,6 +62,17 @@ export async function PATCH(
       return NextResponse.json(
         { error: { code: "FORBIDDEN", message: "Conversa já está atribuída" } },
         { status: 403 }
+      );
+    }
+  }
+
+  // O destinatário precisa pertencer a um time com acesso ao Canal da conversa
+  // (ADMIN é sempre elegível). Garante atribuição só dentro da equipe do Canal.
+  if (user_id && conversation.inboxId) {
+    if (!(await userSeesInbox(user_id, conversation.inboxId))) {
+      return NextResponse.json(
+        { error: { code: "FORBIDDEN", message: "O agente não pertence à equipe deste canal" } },
+        { status: 422 }
       );
     }
   }

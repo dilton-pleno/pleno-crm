@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Prisma, ChannelType } from "@prisma/client";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { visibleInboxIds } from "@/lib/visibility";
+import { visibleInboxIds, visiblePipelineIds } from "@/lib/visibility";
 
 const CHANNEL_VALUES: ChannelType[] = ["whatsapp", "instagram", "messenger", "email", "site"];
 
@@ -15,6 +15,15 @@ export async function GET(
 
   const { id } = await params;
   const { searchParams } = request.nextUrl;
+
+  // Pipeline fora da visibilidade do time: trata como inexistente.
+  const visiblePipes = await visiblePipelineIds(guard.session.user);
+  if (visiblePipes && !visiblePipes.includes(id)) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "Pipeline não encontrado" } },
+      { status: 404 }
+    );
+  }
 
   const agentId = searchParams.get("agent_id");
   const channelParam = searchParams.get("channel");

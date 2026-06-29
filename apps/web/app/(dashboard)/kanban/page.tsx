@@ -1,11 +1,14 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { visiblePipelineIds } from "@/lib/visibility";
 import { KanbanBoard } from "./kanban-board";
 
 export default async function KanbanPage() {
   const session = await auth();
   if (!session) redirect("/login");
+
+  const visiblePipes = await visiblePipelineIds(session.user);
 
   const [agents, pipelines] = await Promise.all([
     prisma.user.findMany({
@@ -14,6 +17,7 @@ export default async function KanbanPage() {
       orderBy: { name: "asc" },
     }),
     prisma.pipeline.findMany({
+      where: visiblePipes ? { id: { in: visiblePipes } } : {},
       orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
       select: { id: true, name: true, isDefault: true },
     }),

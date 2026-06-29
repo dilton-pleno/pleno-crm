@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess, requireRoles } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { visiblePipelineIds } from "@/lib/visibility";
 
 // Estágios padrão de um pipeline novo.
 const DEFAULT_STAGES = [
@@ -16,7 +17,11 @@ export async function GET(): Promise<NextResponse> {
   const guard = await requireAccess("kanban");
   if (!guard.ok) return guard.response;
 
+  // Visibilidade por time: não-ADMIN só vê pipelines vinculados aos seus times.
+  const visiblePipes = await visiblePipelineIds(guard.session.user);
+
   const pipelines = await prisma.pipeline.findMany({
+    where: visiblePipes ? { id: { in: visiblePipes } } : {},
     orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
     include: {
       stages: {
