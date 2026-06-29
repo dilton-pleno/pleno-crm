@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { normalizeHandle } from "@/lib/instagram-link";
 
 const patchSchema = z
   .object({
@@ -9,13 +10,15 @@ const patchSchema = z
     email: z.string().email().nullable().optional(),
     phone: z.string().nullable().optional(),
     notes: z.string().nullable().optional(),
+    instagram_handle: z.string().nullable().optional(),
   })
   .refine(
     (d) =>
       d.name !== undefined ||
       d.email !== undefined ||
       d.phone !== undefined ||
-      d.notes !== undefined,
+      d.notes !== undefined ||
+      d.instagram_handle !== undefined,
     { message: "Informe ao menos um campo para atualizar" }
   );
 
@@ -51,6 +54,7 @@ export async function GET(
       email: contact.email,
       avatarUrl: contact.avatarUrl,
       notes: contact.notes,
+      instagram_handle: contact.instagramHandle,
       channels: contact.channels,
       tags: contact.tags,
     },
@@ -83,7 +87,7 @@ export async function PATCH(
     );
   }
 
-  const { name, email, phone, notes } = parsed.data;
+  const { name, email, phone, notes, instagram_handle } = parsed.data;
   const updated = await prisma.contact.update({
     where: { id },
     data: {
@@ -91,6 +95,7 @@ export async function PATCH(
       ...(email !== undefined ? { email } : {}),
       ...(phone !== undefined ? { phone } : {}),
       ...(notes !== undefined ? { notes } : {}),
+      ...(instagram_handle !== undefined ? { instagramHandle: normalizeHandle(instagram_handle) } : {}),
     },
   });
 

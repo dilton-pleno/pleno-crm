@@ -91,6 +91,7 @@ export default async function ContatoPage({ params }: Props) {
         name={contact.name}
         email={contact.email}
         phone={contact.phone}
+        instagramHandle={contact.instagramHandle}
         canEdit={canEdit}
       />
 
