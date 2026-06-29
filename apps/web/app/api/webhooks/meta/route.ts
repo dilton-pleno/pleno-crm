@@ -4,6 +4,7 @@ import { getMetaConfig } from "@/lib/meta-config";
 import { ingestInboundMessage } from "@/lib/inbound-message";
 import { upsertPostComment } from "@/lib/post-comment";
 import { linkInstagramHandle } from "@/lib/instagram-link";
+import { resolveInboxByMetaId } from "@/lib/inbox-routing";
 
 // ============================================================
 // Tipos do payload da Meta (Instagram Direct / Messenger)
@@ -65,7 +66,7 @@ function mapAttachmentType(type: string): MetaMediaType | null {
   }
 }
 
-async function handleMessaging(object: string, event: MetaMessaging): Promise<void> {
+async function handleMessaging(object: string, entryId: string, event: MetaMessaging): Promise<void> {
   const message = event.message;
   if (!message) return;
   // Ignora echoes (mensagens enviadas pela própria página).
@@ -74,6 +75,9 @@ async function handleMessaging(object: string, event: MetaMessaging): Promise<vo
   const channelType = object === "instagram" ? "instagram" : "messenger";
   const inboxName = object === "instagram" ? "Instagram" : "Messenger";
   const senderId = event.sender.id;
+
+  // Canal de origem: page id / IG id (entry.id) → Inbox (fallback Canal Padrão).
+  const inboxId = await resolveInboxByMetaId(entryId);
 
   const attachment = message.attachments?.[0];
   const mediaType = attachment ? mapAttachmentType(attachment.type) : null;
@@ -100,6 +104,7 @@ async function handleMessaging(object: string, event: MetaMessaging): Promise<vo
     mediaType,
     sentAt: new Date(event.timestamp),
     inboxName,
+    inboxId,
   });
 
   // Instagram: grava o @ no contato e unifica automaticamente com quem já
@@ -172,7 +177,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       for (const entry of payload.entry ?? []) {
         for (const event of entry.messaging ?? []) {
-          await handleMessaging(payload.object, event);
+          await handleMessaging(payload.object, entry.id, event);
         }
         for (const change of entry.changes ?? []) {
           if (change.field === "comments") {

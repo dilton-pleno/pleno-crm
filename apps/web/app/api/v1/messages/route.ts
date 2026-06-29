@@ -4,6 +4,7 @@ import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia } from "@/lib/evolution";
 import { sendInstagramDirect, sendMessengerMessage } from "@/lib/meta";
+import { resolveWhatsappInstance } from "@/lib/inbox-routing";
 import { emitEvent } from "@/lib/websocket";
 
 const schema = z.object({
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     if (channelType === "whatsapp") {
-      const instanceName = process.env.EVOLUTION_INSTANCE ?? "atendimento";
+      const instanceName = await resolveWhatsappInstance(conversation.inboxId);
       if (media_url && media_type) {
         const result = await sendMedia(instanceName, to, media_url, content ?? "", media_type);
         externalId = result.key?.id ?? null;

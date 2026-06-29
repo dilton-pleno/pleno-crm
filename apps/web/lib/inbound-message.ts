@@ -28,6 +28,8 @@ export interface InboundMessage {
   sentAt: Date;
   /** Rótulo da inbox exibido na UI (ex.: "WhatsApp", "Instagram") */
   inboxName: string;
+  /** Canal (Inbox) que originou a mensagem; null cai no Canal Padrão. */
+  inboxId?: string | null;
 }
 
 /**
@@ -67,6 +69,7 @@ export async function ingestInboundMessage(msg: InboundMessage): Promise<void> {
         contactId: contact.id,
         channelType: msg.channelType,
         channelIdentifier: msg.channelIdentifier,
+        inboxId: msg.inboxId ?? null,
       },
     });
     channelId = channel.id;
@@ -86,6 +89,7 @@ export async function ingestInboundMessage(msg: InboundMessage): Promise<void> {
         channelId,
         status: "open",
         inboxName: msg.inboxName,
+        inboxId: msg.inboxId ?? null,
       },
     });
 

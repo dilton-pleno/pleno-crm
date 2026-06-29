@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { sendMediaBase64, sendWhatsAppAudio } from "@/lib/evolution";
+import { resolveWhatsappInstance } from "@/lib/inbox-routing";
 import { emitEvent } from "@/lib/websocket";
 
 const MAX_DOCUMENT = 50 * 1024 * 1024; // 50 MB
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const mimetype = file.type || "application/octet-stream";
   const fileName = file.name || "arquivo";
   const to = conversation.channel.channelIdentifier;
-  const instanceName = process.env.EVOLUTION_INSTANCE ?? "atendimento";
+  const instanceName = await resolveWhatsappInstance(conversation.inboxId);
 
   let externalId: string | null = null;
   try {

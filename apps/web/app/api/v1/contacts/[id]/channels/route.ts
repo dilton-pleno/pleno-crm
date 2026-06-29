@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { getDefaultInboxId } from "@/lib/inbox-routing";
 
 const schema = z.object({
   channel_type: z.enum(["whatsapp", "instagram", "messenger", "email", "site"]),
@@ -70,6 +71,7 @@ export async function POST(
       contactId: id,
       channelType: channel_type,
       channelIdentifier: channel_identifier,
+      inboxId: await getDefaultInboxId(),
       metadata: metadata as Prisma.InputJsonValue | undefined,
     },
   });

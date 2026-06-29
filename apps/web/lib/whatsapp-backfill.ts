@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { findChats, findMessages, type WaMessageRecord } from "@/lib/evolution";
 import { getWhatsappConfig, mergeWhatsappConfig } from "@/lib/whatsapp-config";
+import { resolveInboxByWhatsappInstance } from "@/lib/inbox-routing";
 
 function extractPhone(remoteJid: string): string {
   return remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "").split(":")[0] ?? remoteJid;
@@ -34,7 +35,7 @@ function tsToDate(ts: number | string | undefined): Date {
  * não emite WebSocket, não reabre conversa). Deduplica por externalId.
  * Retorna true se a mensagem foi criada.
  */
-async function backfillMessage(record: WaMessageRecord): Promise<boolean> {
+async function backfillMessage(record: WaMessageRecord, inboxId: string | null): Promise<boolean> {
   const externalId = record.key?.id;
   if (!externalId) return false;
 
@@ -55,7 +56,7 @@ async function backfillMessage(record: WaMessageRecord): Promise<boolean> {
     const name = record.key.fromMe ? phone : record.pushName?.trim() || phone;
     const contact = await prisma.contact.create({ data: { name, phone } });
     channel = await prisma.contactChannel.create({
-      data: { contactId: contact.id, channelType: "whatsapp", channelIdentifier: phone },
+      data: { contactId: contact.id, channelType: "whatsapp", channelIdentifier: phone, inboxId },
     });
   }
 
@@ -68,7 +69,7 @@ async function backfillMessage(record: WaMessageRecord): Promise<boolean> {
   });
   if (!conversation) {
     conversation = await prisma.conversation.create({
-      data: { contactId: channel.contactId, channelId: channel.id, status: "resolved", inboxName: "WhatsApp" },
+      data: { contactId: channel.contactId, channelId: channel.id, status: "resolved", inboxName: "WhatsApp", inboxId },
       select: { id: true },
     });
   }
@@ -118,6 +119,9 @@ export async function backfillAllChats(instanceName: string, days = 90): Promise
 
   await setProgress({ status: "running", chats: 0, imported: 0, start: startISO });
 
+  // Canal de origem (instância → Inbox, fallback Canal Padrão), resolvido uma vez.
+  const inboxId = await resolveInboxByWhatsappInstance(instanceName);
+
   try {
     const chats = (await findChats(instanceName)).filter(
       (c) => c.remoteJid.endsWith("@s.whatsapp.net") || !c.remoteJid.includes("@")
@@ -135,7 +139,7 @@ export async function backfillAllChats(instanceName: string, days = 90): Promise
         for (const rec of records) {
           if (tsToDate(rec.messageTimestamp).getTime() < cutoff) continue;
           allOld = false;
-          if (await backfillMessage(rec)) imported++;
+          if (await backfillMessage(rec, inboxId)) imported++;
         }
 
         // Páginas vêm da mais recente p/ mais antiga; se a página inteira já é

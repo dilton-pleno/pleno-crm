@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ingestInboundMessage } from "@/lib/inbound-message";
 import { getBase64FromMediaMessage } from "@/lib/evolution";
 import { handleConnectionUpdate } from "@/lib/whatsapp-connection";
+import { resolveInboxByWhatsappInstance } from "@/lib/inbox-routing";
 
 type WhatsAppEvent = "messages.upsert" | "messages.update" | "connection.update";
 
@@ -81,7 +82,7 @@ function extractMediaInfo(data: MessageUpsertData): {
   return { content: null, mediaUrl: null, mediaType: null, fileName: null };
 }
 
-async function handleMessageUpsert(data: MessageUpsertData): Promise<void> {
+async function handleMessageUpsert(data: MessageUpsertData, instance: string): Promise<void> {
   // Payload defensivo: ignora eventos sem chave/id (ex.: ruído de reconexão).
   if (!data?.key?.id || !data.key.remoteJid) return;
 
@@ -113,7 +114,8 @@ async function handleMessageUpsert(data: MessageUpsertData): Promise<void> {
   let mediaFileName: string | null = fileName;
 
   if (mediaType) {
-    const instanceName = process.env.EVOLUTION_INSTANCE;
+    // Baixa a mídia da MESMA instância que recebeu a mensagem (fallback p/ env).
+    const instanceName = instance || process.env.EVOLUTION_INSTANCE;
     if (instanceName) {
       try {
         const media = await getBase64FromMediaMessage(instanceName, {
@@ -136,6 +138,9 @@ async function handleMessageUpsert(data: MessageUpsertData): Promise<void> {
   // caso usamos o telefone como nome ao criar um contato novo.
   const contactName = data.key.fromMe ? phone : data.pushName ?? phone;
 
+  // Canal de origem: instância do Evolution → Inbox (fallback Canal Padrão).
+  const inboxId = await resolveInboxByWhatsappInstance(instance);
+
   await ingestInboundMessage({
     channelType: "whatsapp",
     channelIdentifier: phone,
@@ -151,6 +156,7 @@ async function handleMessageUpsert(data: MessageUpsertData): Promise<void> {
     mediaFileName,
     sentAt: new Date(data.messageTimestamp * 1000),
     inboxName: "WhatsApp",
+    inboxId,
   });
 }
 
@@ -198,7 +204,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (payload.event === "messages.upsert") {
         // Algumas versões mandam um array de mensagens.
         const items = Array.isArray(payload.data) ? payload.data : [payload.data];
-        for (const item of items) await handleMessageUpsert(item as MessageUpsertData);
+        for (const item of items) await handleMessageUpsert(item as MessageUpsertData, payload.instance);
       } else if (payload.event === "messages.update") {
         // Pode vir como objeto único ou array de updates.
         const items = Array.isArray(payload.data) ? payload.data : [payload.data];
