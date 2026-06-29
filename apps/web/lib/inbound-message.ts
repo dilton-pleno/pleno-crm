@@ -1,6 +1,7 @@
 import type { ChannelType, MediaType, MessageDirection } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { emitEvent } from "@/lib/websocket";
+import { runAutomationsFor } from "@/lib/automation-engine";
 
 export interface InboundMessage {
   channelType: ChannelType;
@@ -52,6 +53,7 @@ export async function ingestInboundMessage(msg: InboundMessage): Promise<void> {
 
   let channelId: string;
   let contactId: string;
+  const isNewContact = !existingChannel;
 
   if (existingChannel) {
     channelId = existingChannel.id;
@@ -149,5 +151,21 @@ export async function ingestInboundMessage(msg: InboundMessage): Promise<void> {
     emitEvent("conversation:new", { conversationId: conversation.id, contactId });
   } else {
     emitEvent("message:new", { conversationId: conversation.id, messageId: message.id });
+  }
+
+  // Automações: só para mensagens recebidas do contato (direction "in"); o eco
+  // de saída não dispara gatilhos. Tolerante a falhas (não quebra a ingestão).
+  if (direction === "in") {
+    const base = {
+      conversationId: conversation.id,
+      contactId,
+      inboxId: msg.inboxId ?? null,
+      channelType: msg.channelType,
+      messageContent: msg.content,
+    };
+    await runAutomationsFor({ trigger: "new_message", ...base });
+    if (msg.content) await runAutomationsFor({ trigger: "keyword", ...base });
+    if (isNewContact) await runAutomationsFor({ trigger: "new_contact", ...base });
+    if (isNewConversation) await runAutomationsFor({ trigger: "conversation_opened", ...base });
   }
 }

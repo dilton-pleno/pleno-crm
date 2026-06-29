@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { sendText, sendMedia } from "@/lib/evolution";
-import { sendInstagramDirect, sendMessengerMessage } from "@/lib/meta";
-import { resolveWhatsappInstance } from "@/lib/inbox-routing";
-import { emitEvent } from "@/lib/websocket";
+import { sendOutboundMessage } from "@/lib/outbound";
 
 const schema = z.object({
   conversation_id: z.string().uuid(),
@@ -42,9 +39,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const channelType = conversation.channel.channelType;
-  const to = conversation.channel.channelIdentifier;
-
   if (!content && !media_url) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "content ou media_url obrigatório" } },
@@ -52,39 +46,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // ID da mensagem no canal externo (key.id do Evolution), guardado para
-  // deduplicar o eco fromMe que o webhook do WhatsApp devolve.
-  let externalId: string | null = null;
-
+  let message;
   try {
-    if (channelType === "whatsapp") {
-      const instanceName = await resolveWhatsappInstance(conversation.inboxId);
-      if (media_url && media_type) {
-        const result = await sendMedia(instanceName, to, media_url, content ?? "", media_type);
-        externalId = result.key?.id ?? null;
-      } else if (content) {
-        const result = await sendText(instanceName, to, content);
-        externalId = result.key?.id ?? null;
-      }
-    } else if (channelType === "instagram" || channelType === "messenger") {
-      // Envio via Meta suporta texto nesta fase; mídia será adicionada depois.
-      if (!content) {
-        return NextResponse.json(
-          { error: { code: "VALIDATION_ERROR", message: "Envio de mídia ainda não suportado neste canal" } },
-          { status: 422 }
-        );
-      }
-      if (channelType === "instagram") {
-        await sendInstagramDirect(to, content, conversation.inboxId);
-      } else {
-        await sendMessengerMessage(to, content, conversation.inboxId);
-      }
-    } else {
-      return NextResponse.json(
-        { error: { code: "UNSUPPORTED_CHANNEL", message: `Canal "${channelType}" não suporta envio` } },
-        { status: 422 }
-      );
-    }
+    message = await sendOutboundMessage(conversation, {
+      content,
+      mediaUrl: media_url,
+      mediaType: media_type,
+      senderId: session.user.id,
+    });
   } catch (err) {
     console.error("[messages] Erro ao enviar mensagem:", err);
     return NextResponse.json(
@@ -92,20 +61,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 502 }
     );
   }
-
-  const message = await prisma.message.create({
-    data: {
-      conversationId: conversation_id,
-      direction: "out",
-      content: content ?? null,
-      mediaUrl: media_url ?? null,
-      mediaType: media_type ?? null,
-      senderId: session.user.id,
-      externalId,
-    },
-  });
-
-  emitEvent("message:new", { conversationId: conversation_id, messageId: message.id });
 
   return NextResponse.json(
     {

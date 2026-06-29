@@ -582,8 +582,39 @@ model Automation {
 
   creator User       @relation("CreatedBy", fields: [createdBy], references: [id])
   actions AutomationAction[]
+  runs    AutomationRun[]
 
   @@map("automations")
+}
+
+enum AutomationRunStatus {
+  running
+  waiting
+  done
+  error
+}
+
+// Registro de cada disparo de automação: observabilidade (log) e base para a
+// ação `wait` (status waiting + resumeAt, retomado por cron na Fase 3).
+model AutomationRun {
+  id              String              @id @default(uuid())
+  automationId    String              @map("automation_id")
+  conversationId  String?             @map("conversation_id")
+  contactId       String?             @map("contact_id")
+  trigger         String // tipo de gatilho que disparou
+  status          AutomationRunStatus @default(running)
+  currentPosition Int                 @default(0) @map("current_position")
+  resumeAt        DateTime?           @map("resume_at")
+  context         Json?
+  error           String?
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@index([automationId])
+  @@index([status, resumeAt])
+  @@map("automation_runs")
 }
 
 model AutomationAction {
