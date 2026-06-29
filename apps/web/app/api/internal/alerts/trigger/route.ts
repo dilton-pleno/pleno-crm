@@ -4,6 +4,8 @@ import { requireInternalSecret } from "@/lib/internal-auth";
 import { prisma } from "@/lib/prisma";
 import { emitEvent } from "@/lib/websocket";
 import { summarize, type CampaignRow } from "@/lib/analytics-query";
+import { sendText } from "@/lib/evolution";
+import { resolveWhatsappInstance } from "@/lib/inbox-routing";
 
 const SELECT = {
   spend: true,
@@ -104,6 +106,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       alertId: alert.id,
       message,
     });
+
+    // Opcional: além do sino, envia o alerta via WhatsApp para um número
+    // configurado (ALERTS_WHATSAPP_NUMBER). Falha não interrompe o fluxo.
+    const alertsNumber = process.env.ALERTS_WHATSAPP_NUMBER?.replace(/\D/g, "");
+    if (alertsNumber) {
+      try {
+        const instance = await resolveWhatsappInstance(null);
+        await sendText(instance, alertsNumber, `🔔 ${message}`);
+      } catch (err) {
+        console.error("[alerts] Falha ao enviar alerta via WhatsApp:", err);
+      }
+    }
+
     triggered++;
   }
 

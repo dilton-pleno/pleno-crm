@@ -9,6 +9,7 @@ export type AutomationTrigger =
   | "keyword"
   | "new_contact"
   | "conversation_opened"
+  | "abandoned_cart"
   | "schedule";
 
 export interface TriggerContext {

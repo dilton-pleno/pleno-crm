@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { WbuyOrder, WbuyAbandonedCart, WbuyCustomerRaw } from "@/lib/wbuy";
 import { upsertWbuyOrder, updateWbuyOrderStatus, upsertAbandonedCart } from "@/lib/wbuy-order";
 import { enrichContactFromCustomer } from "@/lib/wbuy-customer";
+import { runAbandonedCartRecovery } from "@/lib/cart-recovery";
 
 interface WbuyWebhookPayload {
   lid?: string;
@@ -43,7 +44,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           await updateWbuyOrderStatus(d.pedido_id, d.status_nome ?? "—");
         }
       } else if (payload.type === "abandoned_cart" && payload.data) {
-        await upsertAbandonedCart(payload.data as WbuyAbandonedCart);
+        const cart = payload.data as WbuyAbandonedCart;
+        await upsertAbandonedCart(cart);
+        await runAbandonedCartRecovery({ phone: cart.cliente?.telefone, name: cart.cliente?.nome });
       } else if (payload.type === "customer" && payload.data) {
         // Enriquece um contato existente (não cria contato sem interação).
         await enrichContactFromCustomer(payload.data as WbuyCustomerRaw);

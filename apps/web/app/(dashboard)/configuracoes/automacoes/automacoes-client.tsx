@@ -37,6 +37,7 @@ const TRIGGER_LABELS: Record<string, string> = {
   keyword: "Palavra-chave",
   new_contact: "Novo contato",
   conversation_opened: "Conversa aberta",
+  abandoned_cart: "Carrinho abandonado",
   schedule: "Agendado",
 };
 const TRIGGERS = Object.keys(TRIGGER_LABELS);
@@ -141,6 +142,18 @@ const TEMPLATES: { id: string; name: string; description: string; make: () => Bu
         { action_type: "add_tag", config: { tag: "orçamento" } },
         { action_type: "assign_agent", config: { user_id: "" } },
       ] as BuilderAction[],
+    }),
+  },
+  {
+    id: "cart",
+    name: "Recuperação de carrinho",
+    description: "Quando a Wbuy avisa um carrinho abandonado, envia um WhatsApp de recuperação (1× por contato). Requer o webhook da Wbuy.",
+    make: () => ({
+      ...blankBuilder(),
+      name: "Recuperação de carrinho",
+      trigger_type: "abandoned_cart",
+      oncePerContact: true,
+      actions: [{ action_type: "send_message", config: { message: "Você deixou itens no carrinho 🛒 Posso te ajudar a finalizar a compra?" } }],
     }),
   },
   {
