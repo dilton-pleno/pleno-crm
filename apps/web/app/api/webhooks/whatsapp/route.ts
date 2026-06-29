@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ingestInboundMessage } from "@/lib/inbound-message";
 import { getBase64FromMediaMessage } from "@/lib/evolution";
+import { handleConnectionUpdate } from "@/lib/whatsapp-connection";
 
 type WhatsAppEvent = "messages.upsert" | "messages.update" | "connection.update";
 
@@ -81,6 +82,9 @@ function extractMediaInfo(data: MessageUpsertData): {
 }
 
 async function handleMessageUpsert(data: MessageUpsertData): Promise<void> {
+  // Payload defensivo: ignora eventos sem chave/id (ex.: ruído de reconexão).
+  if (!data?.key?.id || !data.key.remoteJid) return;
+
   // fromMe = mensagem enviada pelo próprio número, inclusive respostas feitas
   // direto pelo app do WhatsApp no celular. Ingerimos como "out" para o
   // histórico ficar completo; o eco das mensagens enviadas pelo CRM é
@@ -151,8 +155,11 @@ async function handleMessageUpsert(data: MessageUpsertData): Promise<void> {
 }
 
 async function handleMessageUpdate(data: MessageUpdateData): Promise<void> {
-  const { key, update } = data;
-  if (!update.status) return;
+  // A Evolution pode mandar messages.update sem `update` (ou sem `key`) quando a
+  // instância está instável/reconectando; ignora em vez de quebrar.
+  const key = data?.key;
+  const update = data?.update;
+  if (!update?.status || !key?.id) return;
 
   // Evolution status: 3 = delivered, 4 = read
   const now = new Date();
@@ -189,11 +196,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   setImmediate(async () => {
     try {
       if (payload.event === "messages.upsert") {
-        await handleMessageUpsert(payload.data as MessageUpsertData);
+        // Algumas versões mandam um array de mensagens.
+        const items = Array.isArray(payload.data) ? payload.data : [payload.data];
+        for (const item of items) await handleMessageUpsert(item as MessageUpsertData);
       } else if (payload.event === "messages.update") {
-        await handleMessageUpdate(payload.data as MessageUpdateData);
+        // Pode vir como objeto único ou array de updates.
+        const items = Array.isArray(payload.data) ? payload.data : [payload.data];
+        for (const item of items) await handleMessageUpdate(item as MessageUpdateData);
+      } else if (payload.event === "connection.update") {
+        const data = payload.data as ConnectionUpdateData;
+        await handleConnectionUpdate(payload.instance, data?.state, data?.statusReason);
       }
-      // connection.update: log only, no DB action needed
     } catch (err) {
       // No Node, passar o Error como argumento imprime mensagem + stack.
       console.error("[webhook/whatsapp] Erro ao processar evento:", err);
