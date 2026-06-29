@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
+import { requireConversationAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 
 // Content-Type padrão por tipo de mídia, usado quando o mime real não foi
@@ -24,6 +25,7 @@ export async function GET(
   const message = await prisma.message.findUnique({
     where: { id },
     select: {
+      conversationId: true,
       mediaData: true,
       mediaType: true,
       mediaMimeType: true,
@@ -37,6 +39,10 @@ export async function GET(
       { status: 404 }
     );
   }
+
+  // Object-level authz: só serve mídia de conversas de Canais visíveis.
+  const access = await requireConversationAccess(guard.session, message.conversationId);
+  if (!access.ok) return access.response;
 
   const mime =
     message.mediaMimeType ??

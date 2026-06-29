@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
+import { requireContactAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 import { mergeContacts } from "@/lib/contact-merge";
 
@@ -38,6 +39,12 @@ export async function POST(
       { status: 422 }
     );
   }
+
+  // Object-level authz: o usuário precisa enxergar AMBOS os contatos.
+  const tAccess = await requireContactAccess(guard.session, targetId);
+  if (!tAccess.ok) return tAccess.response;
+  const sAccess = await requireContactAccess(guard.session, sourceId);
+  if (!sAccess.ok) return sAccess.response;
 
   const ok = await mergeContacts(targetId, sourceId);
   if (!ok) {

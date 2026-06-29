@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
+import { requireContactAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 import { getDefaultInboxId } from "@/lib/inbox-routing";
 
@@ -19,6 +20,8 @@ export async function POST(
   if (!guard.ok) return guard.response;
 
   const { id } = await params;
+  const access = await requireContactAccess(guard.session, id);
+  if (!access.ok) return access.response;
 
   const contact = await prisma.contact.findUnique({ where: { id } });
   if (!contact) {

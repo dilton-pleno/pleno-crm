@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
+import { requireContactAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 
 // Exclui uma nota interna (autor ou ADMIN/GESTOR).
@@ -11,7 +12,10 @@ export async function DELETE(
   if (!guard.ok) return guard.response;
   const { id: userId, role } = guard.session.user;
 
-  const { noteId } = await params;
+  const { id: contactId, noteId } = await params;
+  const access = await requireContactAccess(guard.session, contactId);
+  if (!access.ok) return access.response;
+
   const note = await prisma.contactNote.findUnique({ where: { id: noteId } });
   if (!note) {
     return NextResponse.json(

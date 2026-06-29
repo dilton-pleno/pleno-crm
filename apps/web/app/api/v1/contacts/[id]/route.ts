@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
+import { requireContactAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 import { normalizeHandle } from "@/lib/instagram-link";
 
@@ -30,6 +31,8 @@ export async function GET(
   if (!guard.ok) return guard.response;
 
   const { id } = await params;
+  const access = await requireContactAccess(guard.session, id);
+  if (!access.ok) return access.response;
 
   const contact = await prisma.contact.findUnique({
     where: { id },
@@ -69,14 +72,8 @@ export async function PATCH(
   if (!guard.ok) return guard.response;
 
   const { id } = await params;
-
-  const existing = await prisma.contact.findUnique({ where: { id } });
-  if (!existing) {
-    return NextResponse.json(
-      { error: { code: "NOT_FOUND", message: "Contato não encontrado" } },
-      { status: 404 }
-    );
-  }
+  const access = await requireContactAccess(guard.session, id);
+  if (!access.ok) return access.response;
 
   const body = await request.json();
   const parsed = patchSchema.safeParse(body);

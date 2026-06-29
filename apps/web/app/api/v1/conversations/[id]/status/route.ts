@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
+import { requireConversationAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 import { emitEvent } from "@/lib/websocket";
 
@@ -26,13 +27,8 @@ export async function PATCH(
     );
   }
 
-  const conversation = await prisma.conversation.findUnique({ where: { id } });
-  if (!conversation) {
-    return NextResponse.json(
-      { error: { code: "NOT_FOUND", message: "Conversa não encontrada" } },
-      { status: 404 }
-    );
-  }
+  const access = await requireConversationAccess(guard.session, id);
+  if (!access.ok) return access.response;
 
   const updated = await prisma.conversation.update({
     where: { id },

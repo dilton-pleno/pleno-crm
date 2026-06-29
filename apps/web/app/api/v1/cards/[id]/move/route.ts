@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
+import { requireConversationAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 import { emitEvent } from "@/lib/websocket";
 
@@ -35,6 +36,10 @@ export async function PATCH(
       { status: 404 }
     );
   }
+
+  // Object-level authz: só move cards de conversas de Canais visíveis.
+  const access = await requireConversationAccess(guard.session, card.conversationId);
+  if (!access.ok) return access.response;
 
   const stage = await prisma.pipelineStage.findUnique({ where: { id: parsed.data.stage_id } });
   if (!stage) {

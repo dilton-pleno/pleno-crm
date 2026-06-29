@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
+import { requireConversationAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 import { sendOutboundMessage } from "@/lib/outbound";
 
@@ -26,6 +27,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const { conversation_id, content, media_url, media_type } = parsed.data;
+
+  const access = await requireConversationAccess(session, conversation_id);
+  if (!access.ok) return access.response;
 
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversation_id },

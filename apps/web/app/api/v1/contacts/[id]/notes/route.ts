@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
+import { requireContactAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 
 // Lista as notas internas do contato (mais recentes primeiro).
@@ -12,6 +13,9 @@ export async function GET(
   if (!guard.ok) return guard.response;
 
   const { id } = await params;
+  const access = await requireContactAccess(guard.session, id);
+  if (!access.ok) return access.response;
+
   const notes = await prisma.contactNote.findMany({
     where: { contactId: id },
     orderBy: { createdAt: "desc" },
@@ -40,6 +44,9 @@ export async function POST(
   if (!guard.ok) return guard.response;
 
   const { id } = await params;
+  const access = await requireContactAccess(guard.session, id);
+  if (!access.ok) return access.response;
+
   const parsed = createSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json(

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
+import { requireContactAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
@@ -10,6 +11,8 @@ export async function GET(
   if (!guard.ok) return guard.response;
 
   const { id } = await params;
+  const access = await requireContactAccess(guard.session, id);
+  if (!access.ok) return access.response;
 
   const orders = await prisma.order.findMany({
     where: { contactId: id },

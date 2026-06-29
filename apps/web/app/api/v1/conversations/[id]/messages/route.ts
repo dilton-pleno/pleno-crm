@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
+import { requireConversationAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
@@ -11,13 +12,9 @@ export async function GET(
 
   const { id } = await params;
 
-  const conversation = await prisma.conversation.findUnique({ where: { id } });
-  if (!conversation) {
-    return NextResponse.json(
-      { error: { code: "NOT_FOUND", message: "Conversa não encontrada" } },
-      { status: 404 }
-    );
-  }
+  // Object-level authz: só conversas de Canais visíveis ao usuário.
+  const access = await requireConversationAccess(guard.session, id);
+  if (!access.ok) return access.response;
 
   const messages = await prisma.message.findMany({
     where: { conversationId: id },
@@ -59,7 +56,7 @@ export async function GET(
     read_at: m.readAt?.toISOString() ?? null,
     sender: m.sender
       ? { id: m.sender.id, name: m.sender.name, type: "agent" as const }
-      : { id: conversation.contactId, name: "Contato", type: "contact" as const },
+      : { id: access.value.contactId, name: "Contato", type: "contact" as const },
   }));
 
   return NextResponse.json({ data });

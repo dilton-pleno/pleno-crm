@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
+import { requireConversationAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 import { sendMediaBase64, sendWhatsAppAudio } from "@/lib/evolution";
 import { resolveWhatsappInstance } from "@/lib/inbox-routing";
@@ -33,6 +34,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 422 }
     );
   }
+
+  const access = await requireConversationAccess(session, conversationId);
+  if (!access.ok) return access.response;
 
   const mediaType = mediaTypeFromMime(file.type || "");
   const limit = mediaType === "document" ? MAX_DOCUMENT : MAX_OTHER;
