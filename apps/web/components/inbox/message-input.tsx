@@ -16,12 +16,56 @@ interface QuickReply {
   owned: boolean;
 }
 
+const FILE_ACCEPT =
+  "image/*,video/*,audio/*,.pdf,.xls,.xlsx,.csv,.doc,.docx,.zip,.rar," +
+  "application/pdf,application/vnd.ms-excel," +
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet," +
+  "application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document," +
+  "application/zip,application/x-rar-compressed,application/x-zip-compressed";
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export function MessageInput({ conversationId, onMessageSent }: Props) {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const sendFile = useCallback(async () => {
+    if (!file || sending) return;
+    setSending(true);
+    setUploadError(null);
+    try {
+      const fd = new FormData();
+      fd.append("conversation_id", conversationId);
+      fd.append("file", file);
+      if (content.trim()) fd.append("caption", content.trim());
+      const res = await fetch("/api/v1/messages/media", { method: "POST", body: fd });
+      if (res.ok) {
+        setFile(null);
+        setContent("");
+        onMessageSent();
+        textareaRef.current?.focus();
+      } else {
+        const json = await res.json().catch(() => null);
+        setUploadError(json?.error?.message ?? "Falha ao enviar arquivo");
+      }
+    } finally {
+      setSending(false);
+    }
+  }, [file, sending, conversationId, content, onMessageSent]);
 
   const handleSend = useCallback(async () => {
+    if (file) {
+      void sendFile();
+      return;
+    }
     const text = content.trim();
     if (!text || sending) return;
 
@@ -46,7 +90,7 @@ export function MessageInput({ conversationId, onMessageSent }: Props) {
     } finally {
       setSending(false);
     }
-  }, [content, conversationId, onMessageSent, sending]);
+  }, [content, conversationId, onMessageSent, sending, file, sendFile]);
 
   const [showReplies, setShowReplies] = useState(false);
 
@@ -73,11 +117,48 @@ export function MessageInput({ conversationId, onMessageSent }: Props) {
 
   return (
     <div className="border-t border-border p-3 bg-card">
+      {/* Arquivo selecionado (prévia) */}
+      {file && (
+        <div className="mb-2 flex items-center gap-2 bg-muted/50 border border-border rounded-md px-2.5 py-1.5 text-xs">
+          <Paperclip className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+          <span className="text-foreground truncate flex-1">{file.name}</span>
+          <span className="text-muted-foreground flex-shrink-0">{formatSize(file.size)}</span>
+          <button
+            onClick={() => {
+              setFile(null);
+              setUploadError(null);
+            }}
+            className="p-0.5 text-muted-foreground hover:text-destructive flex-shrink-0"
+            title="Remover"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+      {uploadError && (
+        <div className="mb-2 text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-2.5 py-1.5">
+          {uploadError}
+        </div>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={FILE_ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          setFile(f);
+          setUploadError(null);
+          e.target.value = ""; // permite reescolher o mesmo arquivo
+        }}
+      />
+
       <div className="flex items-end gap-2">
         <button
+          onClick={() => fileInputRef.current?.click()}
           className="flex-shrink-0 p-2 text-muted-foreground hover:text-foreground transition-colors"
-          title="Enviar arquivo (em breve)"
-          disabled
+          title="Enviar arquivo"
         >
           <Paperclip className="w-4 h-4" />
         </button>
@@ -100,7 +181,11 @@ export function MessageInput({ conversationId, onMessageSent }: Props) {
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Digite uma mensagem... (Enter para enviar, / para respostas rápidas)"
+          placeholder={
+            file
+              ? "Legenda (opcional) — Enter para enviar o arquivo"
+              : "Digite uma mensagem... (Enter para enviar, / para respostas rápidas)"
+          }
           rows={1}
           className="flex-1 resize-none bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring max-h-32 overflow-y-auto"
           style={{ minHeight: 40 }}
@@ -108,7 +193,7 @@ export function MessageInput({ conversationId, onMessageSent }: Props) {
 
         <button
           onClick={() => void handleSend()}
-          disabled={!content.trim() || sending}
+          disabled={(!content.trim() && !file) || sending}
           className="flex-shrink-0 p-2 bg-primary text-primary-foreground rounded-lg disabled:opacity-40 hover:bg-primary/90 transition-colors"
         >
           <Send className="w-4 h-4" />
