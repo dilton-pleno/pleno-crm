@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireInternalSecret } from "@/lib/internal-auth";
 import { campaignSyncSchema, upsertCampaignMetrics } from "@/lib/analytics-sync";
+import { getGoogleConfig } from "@/lib/google-config";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const unauthorized = requireInternalSecret(request);
@@ -15,11 +16,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const count = await upsertCampaignMetrics(
-    "google",
-    parsed.data,
-    process.env.GOOGLE_ADS_CUSTOMER_ID ?? "unknown"
-  );
+  const { adsCustomerId } = await getGoogleConfig();
+  const count = await upsertCampaignMetrics("google", parsed.data, adsCustomerId ?? "unknown");
 
   return NextResponse.json({ data: { synced: count, upserted: count } });
 }
