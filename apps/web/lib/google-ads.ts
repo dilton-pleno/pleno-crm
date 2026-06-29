@@ -2,6 +2,7 @@
 // (developer token aprovado + OAuth refresh token). Ainda não exercitado.
 
 import type { CampaignInsight, DateRange } from "@/lib/meta-ads";
+import { getGoogleAccessToken, getGoogleConfig } from "@/lib/google-config";
 
 const API_VERSION = "v17";
 
@@ -18,31 +19,6 @@ interface GoogleAdsRow {
   };
 }
 
-async function accessToken(): Promise<string> {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN;
-  if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error("Credenciais OAuth do Google Ads não configuradas");
-  }
-
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: "refresh_token",
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`Google OAuth falhou [${res.status}]`);
-  }
-  const json = (await res.json()) as { access_token: string };
-  return json.access_token;
-}
-
 /**
  * Busca métricas de campanhas via GAQL no período informado.
  */
@@ -50,10 +26,10 @@ export async function getCampaignMetrics(
   customerId: string,
   range: DateRange
 ): Promise<CampaignInsight[]> {
-  const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-  if (!developerToken) throw new Error("GOOGLE_ADS_DEVELOPER_TOKEN não configurado");
+  const { adsDeveloperToken: developerToken } = await getGoogleConfig();
+  if (!developerToken) throw new Error("Developer token do Google Ads não configurado");
 
-  const token = await accessToken();
+  const token = await getGoogleAccessToken();
   const query =
     `SELECT campaign.id, campaign.name, campaign.status, metrics.impressions, ` +
     `metrics.clicks, metrics.cost_micros, metrics.ctr, metrics.average_cpm, ` +

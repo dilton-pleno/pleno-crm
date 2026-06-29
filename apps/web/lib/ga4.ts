@@ -2,6 +2,7 @@
 // credenciais reais (OAuth + property). Ainda não exercitado em runtime.
 
 import type { DateRange } from "@/lib/meta-ads";
+import { getGoogleAccessToken } from "@/lib/google-config";
 
 export interface Ga4Row {
   date: string;
@@ -20,28 +21,6 @@ interface RunReportResponse {
   }>;
 }
 
-async function accessToken(): Promise<string> {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_ADS_REFRESH_TOKEN;
-  if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error("Credenciais OAuth do Google não configuradas");
-  }
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: "refresh_token",
-    }),
-  });
-  if (!res.ok) throw new Error(`Google OAuth falhou [${res.status}]`);
-  const json = (await res.json()) as { access_token: string };
-  return json.access_token;
-}
-
 /**
  * Busca métricas de sessões/usuários por dia e origem/mídia no período.
  */
@@ -49,7 +28,7 @@ export async function getSessionMetrics(
   propertyId: string,
   range: DateRange
 ): Promise<Ga4Row[]> {
-  const token = await accessToken();
+  const token = await getGoogleAccessToken();
   const res = await fetch(
     `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
     {

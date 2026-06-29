@@ -5,6 +5,7 @@ import { RefreshCw, X, QrCode, MessageCircle, CheckCircle2, AlertCircle, History
 import { useWebSocket } from "@/hooks/use-websocket";
 import { WbuyCard } from "./wbuy-card";
 import { MetaCard } from "./meta-card";
+import { GoogleCard } from "./google-card";
 
 interface HistoryImport {
   status: "running" | "done" | "error";
@@ -286,6 +287,7 @@ export function IntegracoesClient({ currentUserId, canManage, isAdmin }: Props) 
 
       {/* Cards de integração — gestão de credenciais só para Admin */}
       {isAdmin && <MetaCard />}
+      {isAdmin && <GoogleCard />}
       {isAdmin && <WbuyCard />}
 
       {showModal && (
