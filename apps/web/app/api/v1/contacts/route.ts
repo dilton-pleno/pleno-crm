@@ -13,12 +13,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "30", 10)));
   const skip = (page - 1) * limit;
 
+  const digits = search?.replace(/\D/g, "");
   const where: Prisma.ContactWhereInput = search
     ? {
         OR: [
           { name: { contains: search, mode: "insensitive" } },
           { email: { contains: search, mode: "insensitive" } },
           { phone: { contains: search } },
+          ...(digits && digits.length >= 3
+            ? [
+                { phone: { contains: digits } },
+                { document: { contains: digits } },
+              ]
+            : []),
         ],
       }
     : {};

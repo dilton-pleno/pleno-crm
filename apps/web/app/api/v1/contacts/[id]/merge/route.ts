@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { mergeContacts } from "@/lib/contact-merge";
 
 const schema = z.object({
   source_contact_id: z.string().uuid(),
@@ -38,35 +39,13 @@ export async function POST(
     );
   }
 
-  const [target, source] = await Promise.all([
-    prisma.contact.findUnique({ where: { id: targetId } }),
-    prisma.contact.findUnique({ where: { id: sourceId } }),
-  ]);
-
-  if (!target || !source) {
+  const ok = await mergeContacts(targetId, sourceId);
+  if (!ok) {
     return NextResponse.json(
       { error: { code: "NOT_FOUND", message: "Contato de origem ou destino não encontrado" } },
       { status: 404 }
     );
   }
-
-  await prisma.$transaction([
-    prisma.contactChannel.updateMany({ where: { contactId: sourceId }, data: { contactId: targetId } }),
-    prisma.conversation.updateMany({ where: { contactId: sourceId }, data: { contactId: targetId } }),
-    prisma.pipelineCard.updateMany({ where: { contactId: sourceId }, data: { contactId: targetId } }),
-    prisma.order.updateMany({ where: { contactId: sourceId }, data: { contactId: targetId } }),
-    // Preenche dados ausentes do destino com os da origem.
-    prisma.contact.update({
-      where: { id: targetId },
-      data: {
-        phone: target.phone ?? source.phone,
-        email: target.email ?? source.email,
-        avatarUrl: target.avatarUrl ?? source.avatarUrl,
-        notes: target.notes ?? source.notes,
-      },
-    }),
-    prisma.contact.delete({ where: { id: sourceId } }),
-  ]);
 
   const merged = await prisma.contact.findUnique({
     where: { id: targetId },

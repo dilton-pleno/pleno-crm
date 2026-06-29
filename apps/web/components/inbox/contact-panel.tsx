@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Phone, Mail, CheckCircle, Clock, ExternalLink, Link2 } from "lucide-react";
 import { OrderHistory } from "./order-history";
 import { ContactNotes } from "./contact-notes";
+import { LinkContact } from "./link-contact";
 import { ChannelIcon } from "@/components/ui/channel-badge";
 import { TagEditor } from "@/components/ui/tag-editor";
 import type { TagData } from "@/components/ui/tag-chip";
@@ -232,6 +233,8 @@ export function ContactPanel({
             <CheckCircle className="w-3 h-3" /> Resolver conversa
           </button>
         )}
+
+        {canLink && onLinked && <LinkContact contactId={contact.id} onLinked={onLinked} />}
       </div>
 
       {/* Sugestão de vinculação de canais (Módulo 2.5) */}

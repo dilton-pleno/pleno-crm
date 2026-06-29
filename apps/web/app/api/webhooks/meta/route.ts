@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhookSignature, getUserProfile } from "@/lib/meta";
 import { ingestInboundMessage } from "@/lib/inbound-message";
 import { upsertPostComment } from "@/lib/post-comment";
+import { linkInstagramHandle } from "@/lib/instagram-link";
 
 // ============================================================
 // Tipos do payload da Meta (Instagram Direct / Messenger)
@@ -99,6 +100,12 @@ async function handleMessaging(object: string, event: MetaMessaging): Promise<vo
     sentAt: new Date(event.timestamp),
     inboxName,
   });
+
+  // Instagram: grava o @ no contato e unifica automaticamente com quem já
+  // tiver esse @ (ex.: contato de WhatsApp), cruzando Direct + WhatsApp.
+  if (channelType === "instagram" && profile?.username) {
+    await linkInstagramHandle(senderId, profile.username);
+  }
 }
 
 async function handleCommentChange(value: MetaCommentValue): Promise<void> {

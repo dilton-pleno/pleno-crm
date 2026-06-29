@@ -171,6 +171,7 @@ model Contact {
   secondaryPhone String?   @map("secondary_phone")     // telefone2
   addresses      Json?                                 // lista de enderecos da Wbuy
   wbuyCustomerId String?   @map("wbuy_customer_id")
+  instagramHandle String?  @map("instagram_handle")    // @ do IG (sem "@", minusculo) p/ cruzar contatos
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
@@ -181,6 +182,7 @@ model Contact {
   tags          Tag[]
   internalNotes ContactNote[]
 
+  @@index([instagramHandle])
   @@map("contacts")
 }
 

@@ -2,17 +2,18 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Phone, Mail, Pencil, Check, X } from "lucide-react";
+import { Phone, Mail, Pencil, Check, X, Instagram } from "lucide-react";
 
 interface Props {
   id: string;
   name: string;
   email: string | null;
   phone: string | null;
+  instagramHandle: string | null;
   canEdit: boolean;
 }
 
-export function ContactEditCard({ id, name, email, phone, canEdit }: Props) {
+export function ContactEditCard({ id, name, email, phone, instagramHandle, canEdit }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -20,6 +21,7 @@ export function ContactEditCard({ id, name, email, phone, canEdit }: Props) {
     name,
     email: email ?? "",
     phone: phone ?? "",
+    instagram: instagramHandle ?? "",
   });
 
   const handleSave = useCallback(async () => {
@@ -33,6 +35,7 @@ export function ContactEditCard({ id, name, email, phone, canEdit }: Props) {
           name: form.name.trim(),
           email: form.email.trim() || null,
           phone: form.phone.trim() || null,
+          instagram_handle: form.instagram.trim() || null,
         }),
       });
       if (res.ok) {
@@ -65,6 +68,12 @@ export function ContactEditCard({ id, name, email, phone, canEdit }: Props) {
           placeholder="E-mail"
           className="text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
         />
+        <input
+          value={form.instagram}
+          onChange={(e) => setForm((f) => ({ ...f, instagram: e.target.value }))}
+          placeholder="@ do Instagram (ex.: meucuidado)"
+          className="text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring"
+        />
         <div className="flex items-center gap-2">
           <button
             onClick={() => void handleSave()}
@@ -75,7 +84,7 @@ export function ContactEditCard({ id, name, email, phone, canEdit }: Props) {
           </button>
           <button
             onClick={() => {
-              setForm({ name, email: email ?? "", phone: phone ?? "" });
+              setForm({ name, email: email ?? "", phone: phone ?? "", instagram: instagramHandle ?? "" });
               setEditing(false);
             }}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:bg-accent rounded-md px-3 py-1.5"
@@ -106,6 +115,12 @@ export function ContactEditCard({ id, name, email, phone, canEdit }: Props) {
               <span className="flex items-center gap-1">
                 <Mail className="w-3.5 h-3.5" />
                 {email}
+              </span>
+            )}
+            {instagramHandle && (
+              <span className="flex items-center gap-1">
+                <Instagram className="w-3.5 h-3.5" />
+                @{instagramHandle}
               </span>
             )}
           </div>
