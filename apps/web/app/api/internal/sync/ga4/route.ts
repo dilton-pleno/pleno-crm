@@ -3,6 +3,8 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { requireInternalSecret } from "@/lib/internal-auth";
 import { prisma } from "@/lib/prisma";
+import { getGoogleConfig } from "@/lib/google-config";
+import { resolveAdStoreId } from "@/lib/ads-store";
 
 const rowSchema = z.object({
   sessions: z.number().int().nonnegative().default(0),
@@ -34,6 +36,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const { date, rows } = parsed.data;
   const day = new Date(`${date}T00:00:00.000Z`);
 
+  // Loja dona da property GA4 configurada (mapa conta→loja; fallback loja padrão).
+  const { ga4PropertyId } = await getGoogleConfig();
+  const storeIntegrationId = await resolveAdStoreId("ga4", ga4PropertyId);
+
   // source/medium compõem a chave única; normalizamos null para evitar que o
   // Postgres trate NULLs como distintos e duplique linhas.
   for (const r of rows) {
@@ -43,6 +49,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       date: day,
       source,
       medium,
+      storeIntegrationId,
       sessions: r.sessions,
       users: r.users,
       pageviews: r.pageviews,

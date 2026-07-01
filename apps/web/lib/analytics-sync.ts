@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import type { AdPlatform } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { resolveAdStoreId } from "@/lib/ads-store";
 
 export const campaignSchema = z.object({
   id: z.string(),
@@ -36,11 +37,14 @@ export async function upsertCampaignMetrics(
 ): Promise<number> {
   const day = new Date(`${input.date}T00:00:00.000Z`);
   const accountId = input.account_id ?? fallbackAccountId;
+  // Loja dona desta conta de anúncio (mapa conta→loja; fallback loja padrão).
+  const storeIntegrationId = await resolveAdStoreId(platform, accountId);
 
   for (const c of input.campaigns) {
     const data = {
       platform,
       accountId,
+      storeIntegrationId,
       campaignId: c.id,
       campaignName: c.name,
       status: c.status ?? null,

@@ -287,6 +287,10 @@ model Integration {
   wbuyReviews           WbuyReview[]           @relation("StoreReviews")
   newsletterSubscribers NewsletterSubscriber[] @relation("StoreNewsletter")
   abandonedCarts        AbandonedCart[]        @relation("StoreCarts")
+  // Contas de anúncio (Meta/Google/GA4) vinculadas a esta loja + métricas.
+  adAccounts            AdAccountStore[]       @relation("StoreAdAccounts")
+  campaignMetrics       CampaignMetric[]       @relation("StoreCampaigns")
+  ga4Metrics            Ga4Metric[]            @relation("StoreGa4")
 
   @@index([type])
   @@index([waInstance])
@@ -541,7 +545,12 @@ model CampaignMetric {
   conversions  Int        @default(0)
   createdAt    DateTime   @default(now()) @map("created_at")
 
+  // Loja (integração e-commerce) dona da conta de anúncio, p/ ROI por loja.
+  storeIntegrationId String?      @map("store_integration_id")
+  store              Integration? @relation("StoreCampaigns", fields: [storeIntegrationId], references: [id], onDelete: Restrict)
+
   @@unique([platform, campaignId, date])
+  @@index([storeIntegrationId])
   @@map("campaign_metrics")
 }
 
@@ -556,8 +565,28 @@ model Ga4Metric {
   medium     String?
   createdAt  DateTime @default(now()) @map("created_at")
 
+  storeIntegrationId String?      @map("store_integration_id")
+  store              Integration? @relation("StoreGa4", fields: [storeIntegrationId], references: [id], onDelete: Restrict)
+
   @@unique([date, source, medium])
+  @@index([storeIntegrationId])
   @@map("ga4_metrics")
+}
+
+// Mapa conta de anúncio → loja. Cada conta (Meta ad account, Google customer,
+// GA4 property) pertence a uma loja; o sync carimba a loja nas métricas.
+model AdAccountStore {
+  id                 String   @id @default(uuid())
+  platform           String // "meta" | "google" | "ga4"
+  accountId          String   @map("account_id")
+  storeIntegrationId String   @map("store_integration_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  store Integration @relation("StoreAdAccounts", fields: [storeIntegrationId], references: [id], onDelete: Cascade)
+
+  @@unique([platform, accountId])
+  @@index([storeIntegrationId])
+  @@map("ad_account_stores")
 }
 
 model MerchantProduct {
