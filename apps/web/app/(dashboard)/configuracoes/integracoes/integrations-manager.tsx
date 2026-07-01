@@ -190,8 +190,8 @@ export function IntegrationsManager() {
           <Radio className="w-5 h-5 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground">Integrações de mensageria</p>
-          <p className="text-xs text-muted-foreground">Crie contas de WhatsApp e Meta e atribua a Canais (uma por Canal)</p>
+          <p className="text-sm font-semibold text-foreground">Integrações</p>
+          <p className="text-xs text-muted-foreground">Contas de WhatsApp, Instagram/Messenger e lojas de e-commerce. As de mensageria são atribuídas a um Canal.</p>
         </div>
         {step === null && (
           <button onClick={startCreate} className="flex items-center gap-1 text-xs bg-primary text-primary-foreground rounded-md px-3 py-2 hover:opacity-90">
