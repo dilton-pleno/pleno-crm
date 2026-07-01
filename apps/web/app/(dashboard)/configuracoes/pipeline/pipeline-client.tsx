@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, ArrowUp, ArrowDown, Trash2, Check, X, Settings } from "lucide-react";
+import { Plus, ArrowUp, ArrowDown, Trash2, Check, X, Settings, ArrowLeft } from "lucide-react";
 import { PipelineManager } from "@/components/kanban/pipeline-manager";
 
 interface Stage {
@@ -136,9 +137,12 @@ export function PipelineConfigClient({ pipelineId, pipelineName, pipelines, init
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-6 max-w-2xl mx-auto w-full">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Configuração do pipeline</h1>
-          <p className="text-sm text-muted-foreground">Estágios de {pipelineName}</p>
+        <div className="flex items-center gap-2">
+          <Link href="/configuracoes" className="p-1.5 text-muted-foreground hover:bg-accent rounded-md"><ArrowLeft className="w-4 h-4" /></Link>
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">Configuração do pipeline</h1>
+            <p className="text-sm text-muted-foreground">Estágios de {pipelineName}</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {pipelines.length > 1 && (

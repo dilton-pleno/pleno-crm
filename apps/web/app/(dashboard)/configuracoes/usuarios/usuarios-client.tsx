@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { UserPlus, Pencil, KeyRound, X, Copy, Check, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { UserPlus, Pencil, KeyRound, X, Copy, Check, Sparkles, ArrowLeft } from "lucide-react";
 import { generatePassword, passwordChecks, isPasswordValid } from "@/lib/password";
 
 type Role = "ADMIN" | "GESTOR" | "ATENDENTE";
@@ -55,7 +56,10 @@ export function UsuariosClient({ currentUserId }: Props) {
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-4 max-w-3xl mx-auto w-full">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-foreground">Usuários</h1>
+        <div className="flex items-center gap-2">
+          <Link href="/configuracoes" className="p-1.5 text-muted-foreground hover:bg-accent rounded-md"><ArrowLeft className="w-4 h-4" /></Link>
+          <h1 className="text-lg font-semibold text-foreground">Usuários</h1>
+        </div>
         <button
           onClick={() => setModal("create")}
           className="flex items-center gap-1.5 text-xs bg-primary text-primary-foreground rounded-md px-3 py-2 hover:opacity-90"

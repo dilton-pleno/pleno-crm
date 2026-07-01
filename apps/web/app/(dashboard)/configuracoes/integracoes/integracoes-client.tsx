@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, X, QrCode, MessageCircle, CheckCircle2, AlertCircle, History } from "lucide-react";
+import Link from "next/link";
+import { RefreshCw, X, QrCode, MessageCircle, CheckCircle2, AlertCircle, History, ArrowLeft } from "lucide-react";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { WbuyCard } from "./wbuy-card";
 import { MetaAdsCard } from "./meta-ads-card";
@@ -150,7 +151,10 @@ export function IntegracoesClient({ currentUserId, canManage, isAdmin }: Props) 
 
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-4 max-w-2xl mx-auto w-full">
-      <h1 className="text-lg font-semibold text-foreground">Integrações</h1>
+      <div className="flex items-center gap-2">
+        <Link href="/configuracoes" className="p-1.5 text-muted-foreground hover:bg-accent rounded-md"><ArrowLeft className="w-4 h-4" /></Link>
+        <h1 className="text-lg font-semibold text-foreground">Integrações</h1>
+      </div>
 
       {/* Admin: gerenciador de integrações como instâncias (WhatsApp + Meta). */}
       {isAdmin && <IntegrationsManager />}
