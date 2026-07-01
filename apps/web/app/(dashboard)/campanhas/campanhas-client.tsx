@@ -144,7 +144,7 @@ export function CampanhasClient() {
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-5 max-w-6xl mx-auto w-full">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-lg font-semibold text-foreground">Campanhas</h1>
+        <h1 className="text-lg font-semibold text-foreground">Marketing — Anúncios</h1>
         <div className="flex items-center gap-2 flex-wrap">
           <PeriodSelector
             preset={preset}

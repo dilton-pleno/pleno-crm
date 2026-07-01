@@ -39,6 +39,7 @@ const TRIGGER_LABELS: Record<string, string> = {
   conversation_opened: "Conversa aberta",
   abandoned_cart: "Carrinho abandonado",
   order_status: "Status de pedido (Wbuy)",
+  purchase_count: "Nº de compras (Wbuy)",
   schedule: "Agendado",
 };
 const TRIGGERS = Object.keys(TRIGGER_LABELS);
@@ -86,6 +87,7 @@ interface BuilderState {
   inboxId: string;
   keyword: string;
   statusFilter: string;
+  purchaseCount: string;
   oncePerContact: boolean;
   useHours: boolean;
   hoursStart: string;
@@ -98,7 +100,7 @@ interface BuilderState {
 
 function blankBuilder(): BuilderState {
   return {
-    name: "", trigger_type: "new_contact", channel: "all", inboxId: "", keyword: "", statusFilter: "",
+    name: "", trigger_type: "new_contact", channel: "all", inboxId: "", keyword: "", statusFilter: "", purchaseCount: "3",
     oncePerContact: false, useHours: false, hoursStart: "08:00", hoursEnd: "18:00",
     hoursOutside: false, schedTime: "09:00", active: false, actions: [],
   };
@@ -187,6 +189,7 @@ function fromAutomation(a: AutomationDetail): BuilderState {
     inboxId: (c.inboxId as string) || "",
     keyword: (c.keyword as string) || "",
     statusFilter: (c.status as string) || "",
+    purchaseCount: c.count != null ? String(c.count) : "3",
     oncePerContact: Boolean(c.oncePerContact),
     useHours: Boolean(hours),
     hoursStart: hours?.start || "08:00",
@@ -223,6 +226,7 @@ function toPayload(s: BuilderState) {
     if (s.inboxId) trigger_config.inboxId = s.inboxId;
     if (s.trigger_type === "keyword" && s.keyword.trim()) trigger_config.keyword = s.keyword.trim();
     if (s.trigger_type === "order_status" && s.statusFilter.trim()) trigger_config.status = s.statusFilter.trim();
+    if (s.trigger_type === "purchase_count") trigger_config.count = Math.max(1, Number(s.purchaseCount) || 1);
     if (s.oncePerContact) trigger_config.oncePerContact = true;
     if (s.useHours) trigger_config.hours = { start: s.hoursStart, end: s.hoursEnd, outside: s.hoursOutside };
   }
@@ -485,6 +489,11 @@ function AutomationBuilder({
             {s.trigger_type === "order_status" && (
               <Field label="Status do pedido (separados por vírgula; vazio = todos)">
                 <input value={s.statusFilter} onChange={(e) => set({ statusFilter: e.target.value })} placeholder="ex.: Enviado, Entregue" className={INPUT} />
+              </Field>
+            )}
+            {s.trigger_type === "purchase_count" && (
+              <Field label="Disparar quando o contato atingir esta quantidade de compras">
+                <input type="number" min={1} value={s.purchaseCount} onChange={(e) => set({ purchaseCount: e.target.value })} placeholder="3" className={`${INPUT} w-32`} />
               </Field>
             )}
             <label className="flex items-center gap-2 text-xs text-foreground">

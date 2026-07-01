@@ -10,6 +10,7 @@ import {
   Hash,
   LayoutGrid,
   BarChart2,
+  Megaphone,
   ShoppingCart,
   Users,
   UsersRound,
@@ -32,7 +33,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Visão geral",  href: "/visao-geral", icon: LayoutDashboard, module: "visao_geral" },
   { label: "Kanban",      href: "/kanban",      icon: LayoutGrid,    module: "kanban"      },
   { label: "Contatos",    href: "/contatos",    icon: Users,         module: "contatos"    },
-  { label: "Campanhas",   href: "/campanhas",   icon: BarChart2,     module: "campanhas"   },
+  { label: "Campanhas",   href: "/disparos",    icon: Megaphone,     module: "automacoes" },
+  { label: "Marketing",   href: "/campanhas",   icon: BarChart2,     module: "campanhas"   },
   { label: "Ecommerce",   href: "/ecommerce",   icon: ShoppingCart,  module: "ecommerce"   },
   { label: "Automações",  href: "/configuracoes/automacoes", icon: Zap, module: "automacoes" },
   // Times: o Gestor gerencia os seus por aqui; o Admin acessa por Configurações.

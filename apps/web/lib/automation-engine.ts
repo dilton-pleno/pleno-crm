@@ -12,6 +12,7 @@ export type AutomationTrigger =
   | "conversation_opened"
   | "abandoned_cart"
   | "order_status"
+  | "purchase_count"
   | "schedule";
 
 export interface TriggerContext {
@@ -23,6 +24,8 @@ export interface TriggerContext {
   messageContent?: string | null;
   /** Status atual do pedido (gatilho order_status). */
   orderStatus?: string | null;
+  /** Nº de compras do contato (gatilho purchase_count). */
+  purchaseCount?: number | null;
 }
 
 interface TriggerConfig {
@@ -31,6 +34,8 @@ interface TriggerConfig {
   keyword?: string;
   /** Filtro de status do pedido (order_status): lista separada por vírgula; vazio = todos. */
   status?: string;
+  /** Nº de compras que dispara (purchase_count): dispara quando atinge exatamente esse total. */
+  count?: number;
   oncePerContact?: boolean;
   hours?: { start: string; end: string; outside?: boolean; days?: number[] };
 }
@@ -88,6 +93,11 @@ function matchesTrigger(a: AutomationWithActions, ctx: TriggerContext): boolean 
       const current = (ctx.orderStatus ?? "").toLowerCase();
       if (!wanted.some((w) => current.includes(w))) return false;
     }
+  }
+  if (a.triggerType === "purchase_count") {
+    const target = Number(cfg.count) || 0;
+    if (target <= 0) return false; // sem meta definida, não dispara
+    if ((ctx.purchaseCount ?? 0) !== target) return false;
   }
   return true;
 }
@@ -245,6 +255,7 @@ interface StoredContext {
   channelType?: string | null;
   messageContent?: string | null;
   orderStatus?: string | null;
+  purchaseCount?: number | null;
 }
 
 // Executa as ações a partir de `startIndex`. Em `wait`, persiste o run como
@@ -290,6 +301,7 @@ async function executeAutomation(a: AutomationWithActions, ctx: TriggerContext):
     channelType: ctx.channelType ?? null,
     messageContent: ctx.messageContent ?? null,
     orderStatus: ctx.orderStatus ?? null,
+    purchaseCount: ctx.purchaseCount ?? null,
   };
   const run = await prisma.automationRun.create({
     data: {
@@ -328,6 +340,7 @@ export async function resumeDueRuns(limit = 50): Promise<{ resumed: number }> {
         channelType: stored.channelType ?? null,
         messageContent: stored.messageContent ?? null,
         orderStatus: stored.orderStatus ?? null,
+        purchaseCount: stored.purchaseCount ?? null,
       };
       await prisma.automationRun.update({ where: { id: run.id }, data: { status: "running" } });
       await runActions(run.automation.actions, ctx, run.id, run.currentPosition);
