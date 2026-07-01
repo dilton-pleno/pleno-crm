@@ -3,12 +3,18 @@ import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { buildInboxMetaConfig, inboxHasMetaToken } from "@/lib/inbox-config";
+import { buildWhatsappCloudConfig, inboxHasCloudToken, inboxCloudWabaId } from "@/lib/whatsapp-channel-config";
 import { DEFAULT_INBOX_ID } from "@/lib/inbox-routing";
 
 const patchSchema = z.object({
   name: z.string().min(1).max(60).optional(),
   active: z.boolean().optional(),
+  whatsapp_provider: z.enum(["evolution", "cloud"]).optional(),
   whatsapp_instance: z.string().max(120).optional().nullable(),
+  whatsapp_phone_number_id: z.string().max(120).optional().nullable(),
+  whatsapp_waba_id: z.string().max(120).optional(),
+  whatsapp_cloud_token: z.string().optional(),
+  whatsapp_verify_token: z.string().max(200).optional(),
   meta_page_id: z.string().max(120).optional().nullable(),
   meta_ig_id: z.string().max(120).optional().nullable(),
   meta_access_token: z.string().optional(),
@@ -43,12 +49,28 @@ export async function PATCH(
   const norm = (v: string | null | undefined): string | null | undefined =>
     v === undefined ? undefined : (v?.trim() || null);
 
+  // whatsappConfig só é reescrito quando algum campo do Cloud vem no payload
+  // (token/waba/verify); caso contrário, mantém o valor atual.
+  const cloudTouched =
+    d.whatsapp_cloud_token !== undefined ||
+    d.whatsapp_waba_id !== undefined ||
+    d.whatsapp_verify_token !== undefined;
+
   const updated = await prisma.inbox.update({
     where: { id },
     data: {
       name: d.name?.trim(),
       active: d.active,
+      whatsappProvider: d.whatsapp_provider,
       whatsappInstance: norm(d.whatsapp_instance),
+      whatsappPhoneNumberId: norm(d.whatsapp_phone_number_id),
+      whatsappConfig: cloudTouched
+        ? buildWhatsappCloudConfig(inbox.whatsappConfig, {
+            accessToken: d.whatsapp_cloud_token,
+            wabaId: d.whatsapp_waba_id,
+            verifyToken: d.whatsapp_verify_token,
+          })
+        : undefined,
       metaPageId: norm(d.meta_page_id),
       metaIgId: norm(d.meta_ig_id),
       metaConfig: d.meta_access_token
@@ -62,7 +84,11 @@ export async function PATCH(
       id: updated.id,
       name: updated.name,
       active: updated.active,
+      whatsapp_provider: updated.whatsappProvider === "cloud" ? "cloud" : "evolution",
       whatsapp_instance: updated.whatsappInstance,
+      whatsapp_phone_number_id: updated.whatsappPhoneNumberId,
+      whatsapp_waba_id: inboxCloudWabaId(updated.whatsappConfig),
+      has_cloud_token: inboxHasCloudToken(updated.whatsappConfig),
       meta_page_id: updated.metaPageId,
       meta_ig_id: updated.metaIgId,
       has_meta_token: inboxHasMetaToken(updated.metaConfig),

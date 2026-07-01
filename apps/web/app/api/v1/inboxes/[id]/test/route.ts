@@ -4,6 +4,8 @@ import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { fetchInstanceStatus } from "@/lib/evolution";
 import { getMessagingConfig } from "@/lib/inbox-config";
+import { getWhatsappChannel } from "@/lib/whatsapp-channel-config";
+import { getPhoneNumberInfo } from "@/lib/whatsapp-cloud";
 
 const schema = z.object({ target: z.enum(["whatsapp", "meta"]) });
 
@@ -35,7 +37,31 @@ export async function POST(
 
   try {
     if (parsed.data.target === "whatsapp") {
-      const instance = inbox.whatsappInstance || process.env.EVOLUTION_INSTANCE;
+      const ch = await getWhatsappChannel(id);
+
+      if (ch.provider === "cloud") {
+        // API oficial: consulta o número na Cloud API.
+        if (!ch.phoneNumberId || !ch.accessToken) {
+          return NextResponse.json(
+            { error: { code: "NOT_CONFIGURED", message: "Phone Number ID e token do Cloud não definidos (Canal nem global)" } },
+            { status: 422 }
+          );
+        }
+        const info = await getPhoneNumberInfo({ phoneNumberId: ch.phoneNumberId, accessToken: ch.accessToken });
+        return NextResponse.json({
+          data: {
+            target: "whatsapp",
+            provider: "cloud",
+            connected: true,
+            verifiedName: info.verifiedName,
+            number: info.displayPhoneNumber,
+            qualityRating: info.qualityRating,
+          },
+        });
+      }
+
+      // API não oficial (Evolution): status da instância.
+      const instance = ch.instance;
       if (!instance) {
         return NextResponse.json(
           { error: { code: "NOT_CONFIGURED", message: "Instância do WhatsApp não definida neste Canal" } },
@@ -46,6 +72,7 @@ export async function POST(
       return NextResponse.json({
         data: {
           target: "whatsapp",
+          provider: "evolution",
           connected: status.status === "connected",
           instance,
           number: status.number,

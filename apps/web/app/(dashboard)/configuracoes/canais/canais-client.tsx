@@ -4,14 +4,20 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Plus, Trash2, Pencil, X, MessageCircle, Facebook,
-  CheckCircle2, AlertCircle, RefreshCw, Radio,
+  CheckCircle2, AlertCircle, RefreshCw, Radio, Cloud, Unplug,
 } from "lucide-react";
+
+export type WhatsappProvider = "evolution" | "cloud";
 
 export interface CanalItem {
   id: string;
   name: string;
   active: boolean;
+  whatsapp_provider: WhatsappProvider;
   whatsapp_instance: string | null;
+  whatsapp_phone_number_id: string | null;
+  whatsapp_waba_id: string | null;
+  has_cloud_token: boolean;
   meta_page_id: string | null;
   meta_ig_id: string | null;
   has_meta_token: boolean;
@@ -22,7 +28,12 @@ export interface CanalItem {
 
 interface FormState {
   name: string;
+  whatsapp_provider: WhatsappProvider;
   whatsapp_instance: string;
+  whatsapp_phone_number_id: string;
+  whatsapp_waba_id: string;
+  whatsapp_cloud_token: string;
+  whatsapp_verify_token: string;
   meta_page_id: string;
   meta_ig_id: string;
   meta_access_token: string;
@@ -30,7 +41,12 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   name: "",
+  whatsapp_provider: "evolution",
   whatsapp_instance: "",
+  whatsapp_phone_number_id: "",
+  whatsapp_waba_id: "",
+  whatsapp_cloud_token: "",
+  whatsapp_verify_token: "",
   meta_page_id: "",
   meta_ig_id: "",
   meta_access_token: "",
@@ -68,10 +84,55 @@ function CanalForm({
   submitLabel: string;
   existing: CanalItem | null;
 }) {
+  const provider = form.whatsapp_provider;
   return (
     <div className="flex flex-col gap-2">
       <Field label="Nome do Canal" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="Ex.: Canal Vendas" />
-      <Field label="Instância do WhatsApp (Evolution)" value={form.whatsapp_instance} onChange={(v) => setForm({ ...form, whatsapp_instance: v })} placeholder="nome-da-instancia" />
+
+      {/* Seletor de provider do WhatsApp */}
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] text-muted-foreground">Provedor do WhatsApp</span>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, whatsapp_provider: "evolution" })}
+            className={`flex items-center justify-center gap-1.5 text-xs rounded-md border px-3 py-2 ${provider === "evolution" ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:bg-accent"}`}
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-green-600" /> API não oficial (Evolution)
+          </button>
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, whatsapp_provider: "cloud" })}
+            className={`flex items-center justify-center gap-1.5 text-xs rounded-md border px-3 py-2 ${provider === "cloud" ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:bg-accent"}`}
+          >
+            <Cloud className="w-3.5 h-3.5 text-blue-600" /> API oficial (Meta Cloud)
+          </button>
+        </div>
+      </div>
+
+      {provider === "evolution" ? (
+        <Field label="Instância do WhatsApp (Evolution)" value={form.whatsapp_instance} onChange={(v) => setForm({ ...form, whatsapp_instance: v })} placeholder="nome-da-instancia" />
+      ) : (
+        <>
+          <Field label="Phone Number ID (Cloud API)" value={form.whatsapp_phone_number_id} onChange={(v) => setForm({ ...form, whatsapp_phone_number_id: v })} placeholder="ID do número na Meta" />
+          <Field label="WABA ID" value={form.whatsapp_waba_id} onChange={(v) => setForm({ ...form, whatsapp_waba_id: v })} placeholder="ID da conta WhatsApp Business" />
+          <Field
+            label="Token de acesso (Cloud)"
+            value={form.whatsapp_cloud_token}
+            onChange={(v) => setForm({ ...form, whatsapp_cloud_token: v })}
+            placeholder={existing?.has_cloud_token ? "•••• (mantém se vazio)" : "Token permanente do sistema"}
+            secret
+          />
+          <Field
+            label="Verify Token do webhook"
+            value={form.whatsapp_verify_token}
+            onChange={(v) => setForm({ ...form, whatsapp_verify_token: v })}
+            placeholder="Usado na verificação do webhook (opcional; há global)"
+            secret
+          />
+        </>
+      )}
+
       <Field label="Meta Page ID (Messenger)" value={form.meta_page_id} onChange={(v) => setForm({ ...form, meta_page_id: v })} placeholder="ID da página do Facebook" />
       <Field label="Instagram ID" value={form.meta_ig_id} onChange={(v) => setForm({ ...form, meta_ig_id: v })} placeholder="ID da conta do Instagram" />
       <Field
@@ -118,7 +179,12 @@ export function CanaisClient({ initialCanais }: { initialCanais: CanalItem[] }) 
   const startEdit = useCallback((c: CanalItem) => {
     setForm({
       name: c.name,
+      whatsapp_provider: c.whatsapp_provider,
       whatsapp_instance: c.whatsapp_instance ?? "",
+      whatsapp_phone_number_id: c.whatsapp_phone_number_id ?? "",
+      whatsapp_waba_id: c.whatsapp_waba_id ?? "",
+      whatsapp_cloud_token: "",
+      whatsapp_verify_token: "",
       meta_page_id: c.meta_page_id ?? "",
       meta_ig_id: c.meta_ig_id ?? "",
       meta_access_token: "",
@@ -159,13 +225,18 @@ export function CanaisClient({ initialCanais }: { initialCanais: CanalItem[] }) 
     setBusy(true);
     setError(null);
     try {
-      // name/instance/page/ig sempre enviados (string vazia limpa); token só se digitado.
+      // name/instance/page/ig sempre enviados (string vazia limpa); tokens só se digitados.
       const payload: Record<string, string> = {
         name: form.name,
+        whatsapp_provider: form.whatsapp_provider,
         whatsapp_instance: form.whatsapp_instance,
+        whatsapp_phone_number_id: form.whatsapp_phone_number_id,
+        whatsapp_waba_id: form.whatsapp_waba_id,
         meta_page_id: form.meta_page_id,
         meta_ig_id: form.meta_ig_id,
       };
+      if (form.whatsapp_cloud_token.trim()) payload.whatsapp_cloud_token = form.whatsapp_cloud_token;
+      if (form.whatsapp_verify_token.trim()) payload.whatsapp_verify_token = form.whatsapp_verify_token;
       if (form.meta_access_token.trim()) payload.meta_access_token = form.meta_access_token;
       const res = await fetch(`/api/v1/inboxes/${id}`, {
         method: "PATCH",
@@ -214,16 +285,31 @@ export function CanaisClient({ initialCanais }: { initialCanais: CanalItem[] }) 
     const json = await res.json();
     if (res.ok) {
       const d = json.data;
-      const text =
-        target === "whatsapp"
-          ? d.connected
-            ? `WhatsApp conectado${d.number ? ` (${d.number})` : ""}`
-            : "WhatsApp desconectado"
-          : `Meta OK — página: ${d.pageName}`;
+      let text: string;
+      if (target === "meta") {
+        text = `Meta OK — página: ${d.pageName}`;
+      } else if (d.provider === "cloud") {
+        text = `Cloud OK — ${d.verifiedName ?? "número"}${d.number ? ` (${d.number})` : ""}${d.qualityRating ? ` · qualidade ${d.qualityRating}` : ""}`;
+      } else {
+        text = d.connected ? `WhatsApp conectado${d.number ? ` (${d.number})` : ""}` : "WhatsApp desconectado";
+      }
       setTests((prev) => ({ ...prev, [id]: { kind: d.connected ? "ok" : "err", text } }));
     } else {
       setTests((prev) => ({ ...prev, [id]: { kind: "err", text: json.error?.message ?? "Falha no teste" } }));
     }
+  }, []);
+
+  const disconnect = useCallback(async (c: CanalItem) => {
+    if (!confirm(`Desconectar o WhatsApp do Canal "${c.name}"? Será preciso escanear um novo QR Code para reconectar (troca de número).`)) return;
+    setTests((prev) => ({ ...prev, [c.id]: { kind: "ok", text: "Desconectando…" } }));
+    const res = await fetch(`/api/v1/inboxes/${c.id}/disconnect`, { method: "POST" });
+    const json = await res.json();
+    setTests((prev) => ({
+      ...prev,
+      [c.id]: res.ok
+        ? { kind: "ok", text: "WhatsApp desconectado — gere um novo QR em Integrações" }
+        : { kind: "err", text: json.error?.message ?? "Falha ao desconectar" },
+    }));
   }, []);
 
   return (
@@ -308,19 +394,42 @@ export function CanaisClient({ initialCanais }: { initialCanais: CanalItem[] }) 
                 <div className="border-t border-border pt-3 flex flex-col gap-2">
                   {/* WhatsApp */}
                   <div className="flex items-center gap-2 text-xs">
-                    <MessageCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    {c.whatsapp_provider === "cloud" ? (
+                      <Cloud className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                    ) : (
+                      <MessageCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    )}
                     <span className="text-muted-foreground">WhatsApp:</span>
-                    {c.whatsapp_instance ? (
+                    {c.whatsapp_provider === "cloud" ? (
+                      c.whatsapp_phone_number_id ? (
+                        <span className="font-medium text-foreground truncate">
+                          oficial · nº {c.whatsapp_phone_number_id}{c.has_cloud_token ? " · token ✓" : ""}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground italic">oficial · sem phone id</span>
+                      )
+                    ) : c.whatsapp_instance ? (
                       <span className="font-medium text-foreground truncate">{c.whatsapp_instance}</span>
                     ) : (
                       <span className="text-muted-foreground italic">global / não definido</span>
                     )}
-                    <button
-                      onClick={() => void test(c.id, "whatsapp")}
-                      className="ml-auto flex items-center gap-1 text-[11px] border border-border rounded px-2 py-1 hover:bg-accent"
-                    >
-                      <RefreshCw className="w-3 h-3" /> Testar
-                    </button>
+                    <div className="ml-auto flex items-center gap-1">
+                      {c.whatsapp_provider === "evolution" && (
+                        <button
+                          onClick={() => void disconnect(c)}
+                          className="flex items-center gap-1 text-[11px] border border-border rounded px-2 py-1 hover:bg-accent text-muted-foreground"
+                          title="Desconectar a sessão (troca de número)"
+                        >
+                          <Unplug className="w-3 h-3" /> Desconectar
+                        </button>
+                      )}
+                      <button
+                        onClick={() => void test(c.id, "whatsapp")}
+                        className="flex items-center gap-1 text-[11px] border border-border rounded px-2 py-1 hover:bg-accent"
+                      >
+                        <RefreshCw className="w-3 h-3" /> Testar
+                      </button>
+                    </div>
                   </div>
                   {/* Meta */}
                   <div className="flex items-center gap-2 text-xs">

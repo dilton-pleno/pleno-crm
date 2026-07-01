@@ -97,6 +97,11 @@ export function inboxHasCloudToken(cfg: Prisma.JsonValue | null): boolean {
   return Boolean((cfg as StoredCloud | null)?.accessTokenEnc);
 }
 
+/** WABA id guardado no Canal (não é segredo), para exibir na UI. */
+export function inboxCloudWabaId(cfg: Prisma.JsonValue | null): string | null {
+  return (cfg as StoredCloud | null)?.wabaId ?? null;
+}
+
 /**
  * Valida o hub.verify_token da verificação do webhook (GET). Aceita o verify
  * token global (env) OU o de qualquer Canal "cloud" que tenha um próprio.
