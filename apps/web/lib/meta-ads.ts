@@ -27,7 +27,14 @@ export interface CampaignInsight {
   conversions: number;
 }
 
+/** Insight de uma campanha em UM dia (para série diária + upsert idempotente). */
+export interface CampaignDayInsight extends CampaignInsight {
+  /** YYYY-MM-DD */
+  date: string;
+}
+
 interface MetaInsight {
+  date_start?: string;
   impressions?: string;
   reach?: string;
   clicks?: string;
@@ -72,20 +79,21 @@ function num(v: string | undefined): number {
 }
 
 /**
- * Busca insights de campanhas de uma ad account no período informado.
- * Conversões e ROAS são derivados de `actions`/`action_values` (purchase).
+ * Busca insights DIÁRIOS de campanhas de uma ad account no período informado
+ * (`time_increment(1)` → uma linha por campanha por dia). Conversões e ROAS são
+ * derivados de `actions`/`action_values` (purchase).
  */
 export async function getCampaignInsights(
   accountId: string,
   range: DateRange
-): Promise<CampaignInsight[]> {
+): Promise<CampaignDayInsight[]> {
   const timeRange = encodeURIComponent(JSON.stringify({ since: range.start, until: range.end }));
   const fields =
-    `name,status,insights.time_range(${timeRange})` +
-    `{impressions,reach,clicks,spend,cpm,ctr,actions,action_values}`;
+    `name,status,insights.time_range(${timeRange}).time_increment(1)` +
+    `{impressions,reach,clicks,spend,cpm,ctr,actions,action_values,date_start}`;
   const url =
     `https://graph.facebook.com/${GRAPH_VERSION}/act_${accountId}/campaigns` +
-    `?fields=${fields}&access_token=${await token()}`;
+    `?fields=${fields}&limit=500&access_token=${await token()}`;
 
   const res = await fetch(url);
   if (!res.ok) {
@@ -96,27 +104,31 @@ export async function getCampaignInsights(
   const json = (await res.json()) as { data?: MetaCampaign[] };
   const campaigns = json.data ?? [];
 
-  return campaigns.map((c) => {
-    const insight = c.insights?.data?.[0];
-    const spend = num(insight?.spend);
-    const purchaseValue = num(
-      insight?.action_values?.find((a) => a.action_type === "purchase")?.value
-    );
-    const conversions = num(
-      insight?.actions?.find((a) => a.action_type === "purchase")?.value
-    );
-    return {
-      id: c.id,
-      name: c.name,
-      status: c.status ?? null,
-      impressions: num(insight?.impressions),
-      reach: num(insight?.reach),
-      clicks: num(insight?.clicks),
-      spend,
-      cpm: num(insight?.cpm),
-      ctr: num(insight?.ctr),
-      roas: spend > 0 ? purchaseValue / spend : 0,
-      conversions,
-    };
-  });
+  const rows: CampaignDayInsight[] = [];
+  for (const c of campaigns) {
+    for (const insight of c.insights?.data ?? []) {
+      const spend = num(insight.spend);
+      const purchaseValue = num(
+        insight.action_values?.find((a) => a.action_type === "purchase")?.value
+      );
+      const conversions = num(
+        insight.actions?.find((a) => a.action_type === "purchase")?.value
+      );
+      rows.push({
+        date: insight.date_start ?? range.start,
+        id: c.id,
+        name: c.name,
+        status: c.status ?? null,
+        impressions: num(insight.impressions),
+        reach: num(insight.reach),
+        clicks: num(insight.clicks),
+        spend,
+        cpm: num(insight.cpm),
+        ctr: num(insight.ctr),
+        roas: spend > 0 ? purchaseValue / spend : 0,
+        conversions,
+      });
+    }
+  }
+  return rows;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Megaphone, CheckCircle2, AlertCircle, Plug, RefreshCw } from "lucide-react";
+import { Megaphone, CheckCircle2, AlertCircle, Plug, RefreshCw, DownloadCloud } from "lucide-react";
 
 interface MetaAdsStatus {
   accessToken: boolean; // tem token (próprio ou herdado da mensageria)
@@ -69,6 +69,26 @@ export function MetaAdsCard() {
         res.ok
           ? { kind: "ok", text: `Conexão OK — conta: ${json.data.accountName}` }
           : { kind: "err", text: json.error?.message ?? "Falha na conexão" }
+      );
+    } finally {
+      setWorking(false);
+    }
+  }, []);
+
+  const sync = useCallback(async () => {
+    setWorking(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/v1/analytics/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform: "meta", days: 30 }),
+      });
+      const json = await res.json();
+      setMessage(
+        res.ok
+          ? { kind: "ok", text: `Sincronizado — ${json.data.synced} registro(s) dos últimos 30 dias.` }
+          : { kind: "err", text: json.error?.message ?? "Falha ao sincronizar" }
       );
     } finally {
       setWorking(false);
@@ -169,13 +189,22 @@ export function MetaAdsCard() {
             {configured ? "Atualizar" : "Configurar"}
           </button>
           {configured && (
-            <button
-              onClick={() => void test()}
-              disabled={working}
-              className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Testar conexão
-            </button>
+            <>
+              <button
+                onClick={() => void test()}
+                disabled={working}
+                className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Testar conexão
+              </button>
+              <button
+                onClick={() => void sync()}
+                disabled={working}
+                className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
+              >
+                <DownloadCloud className="w-3.5 h-3.5" /> Sincronizar agora
+              </button>
+            </>
           )}
         </div>
       )}
