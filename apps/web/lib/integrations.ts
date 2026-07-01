@@ -110,16 +110,46 @@ function buildConfig(
   return next as unknown as Prisma.InputJsonValue;
 }
 
+const withInbox = {
+  inboxWhatsapp: { select: { id: true, name: true } },
+  inboxMeta: { select: { id: true, name: true } },
+} as const;
+
+export type IntegrationWithInbox = Prisma.IntegrationGetPayload<{ include: typeof withInbox }>;
+
 export function listIntegrations(type?: IntegrationType) {
   return prisma.integration.findMany({
     where: type ? { type } : undefined,
     orderBy: { createdAt: "asc" },
-    include: { inboxWhatsapp: { select: { id: true, name: true } }, inboxMeta: { select: { id: true, name: true } } },
+    include: withInbox,
   });
 }
 
 export function getIntegration(id: string) {
   return prisma.integration.findUnique({ where: { id } });
+}
+
+export function getIntegrationFull(id: string) {
+  return prisma.integration.findUnique({ where: { id }, include: withInbox });
+}
+
+/** Serializa uma integração (com Canal atribuído) sem expor segredos. */
+export function serializeIntegration(i: IntegrationWithInbox) {
+  const assigned = i.inboxWhatsapp ?? i.inboxMeta ?? null;
+  return {
+    id: i.id,
+    type: i.type,
+    name: i.name,
+    provider: i.provider,
+    active: i.active,
+    wa_instance: i.waInstance,
+    wa_phone_number_id: i.waPhoneNumberId,
+    waba_id: (i.config as { wabaId?: string } | null)?.wabaId ?? null,
+    meta_page_id: i.metaPageId,
+    meta_ig_id: i.metaIgId,
+    has_token: integrationHasToken(i.config),
+    assigned_inbox: assigned ? { id: assigned.id, name: assigned.name } : null,
+  };
 }
 
 export async function createIntegration(input: IntegrationInput): Promise<Integration> {
