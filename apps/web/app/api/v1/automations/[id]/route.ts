@@ -55,7 +55,7 @@ const actionSchema = z.object({
 
 const patchSchema = z.object({
   name: z.string().min(1).max(80).optional(),
-  trigger_type: z.enum(["new_message", "keyword", "new_contact", "conversation_opened", "abandoned_cart", "schedule"]).optional(),
+  trigger_type: z.enum(["new_message", "keyword", "new_contact", "conversation_opened", "abandoned_cart", "order_status", "schedule"]).optional(),
   trigger_config: z.record(z.unknown()).optional(),
   active: z.boolean().optional(),
   actions: z.array(actionSchema).optional(),

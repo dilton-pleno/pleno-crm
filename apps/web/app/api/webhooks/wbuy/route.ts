@@ -3,6 +3,7 @@ import type { WbuyOrder, WbuyAbandonedCart, WbuyCustomerRaw } from "@/lib/wbuy";
 import { upsertWbuyOrder, updateWbuyOrderStatus, upsertAbandonedCart } from "@/lib/wbuy-order";
 import { enrichContactFromCustomer } from "@/lib/wbuy-customer";
 import { runAbandonedCartRecovery } from "@/lib/cart-recovery";
+import { runOrderStatusDispatch } from "@/lib/order-dispatch";
 import { safeEqual } from "@/lib/crypto";
 
 interface WbuyWebhookPayload {
@@ -43,7 +44,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       } else if (payload.type === "order_status" && payload.data) {
         const d = payload.data as OrderStatusData;
         if (d.pedido_id) {
-          await updateWbuyOrderStatus(d.pedido_id, d.status_nome ?? "—");
+          const status = d.status_nome ?? "—";
+          await updateWbuyOrderStatus(d.pedido_id, status);
+          // Disparo ativo pelo número oficial (só age se houver automação
+          // order_status ativa + Canal oficial configurado).
+          await runOrderStatusDispatch({ orderExternalId: String(d.pedido_id), status });
         }
       } else if (payload.type === "abandoned_cart" && payload.data) {
         const cart = payload.data as WbuyAbandonedCart;

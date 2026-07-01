@@ -38,6 +38,7 @@ const TRIGGER_LABELS: Record<string, string> = {
   new_contact: "Novo contato",
   conversation_opened: "Conversa aberta",
   abandoned_cart: "Carrinho abandonado",
+  order_status: "Status de pedido (Wbuy)",
   schedule: "Agendado",
 };
 const TRIGGERS = Object.keys(TRIGGER_LABELS);
@@ -84,6 +85,7 @@ interface BuilderState {
   channel: string;
   inboxId: string;
   keyword: string;
+  statusFilter: string;
   oncePerContact: boolean;
   useHours: boolean;
   hoursStart: string;
@@ -96,7 +98,7 @@ interface BuilderState {
 
 function blankBuilder(): BuilderState {
   return {
-    name: "", trigger_type: "new_contact", channel: "all", inboxId: "", keyword: "",
+    name: "", trigger_type: "new_contact", channel: "all", inboxId: "", keyword: "", statusFilter: "",
     oncePerContact: false, useHours: false, hoursStart: "08:00", hoursEnd: "18:00",
     hoursOutside: false, schedTime: "09:00", active: false, actions: [],
   };
@@ -184,6 +186,7 @@ function fromAutomation(a: AutomationDetail): BuilderState {
     channel: (c.channel as string) || "all",
     inboxId: (c.inboxId as string) || "",
     keyword: (c.keyword as string) || "",
+    statusFilter: (c.status as string) || "",
     oncePerContact: Boolean(c.oncePerContact),
     useHours: Boolean(hours),
     hoursStart: hours?.start || "08:00",
@@ -219,6 +222,7 @@ function toPayload(s: BuilderState) {
     if (s.channel !== "all") trigger_config.channel = s.channel;
     if (s.inboxId) trigger_config.inboxId = s.inboxId;
     if (s.trigger_type === "keyword" && s.keyword.trim()) trigger_config.keyword = s.keyword.trim();
+    if (s.trigger_type === "order_status" && s.statusFilter.trim()) trigger_config.status = s.statusFilter.trim();
     if (s.oncePerContact) trigger_config.oncePerContact = true;
     if (s.useHours) trigger_config.hours = { start: s.hoursStart, end: s.hoursEnd, outside: s.hoursOutside };
   }
@@ -476,6 +480,11 @@ function AutomationBuilder({
             {s.trigger_type === "keyword" && (
               <Field label="Palavra-chave (a mensagem deve conter)">
                 <input value={s.keyword} onChange={(e) => set({ keyword: e.target.value })} placeholder="ex.: orçamento" className={INPUT} />
+              </Field>
+            )}
+            {s.trigger_type === "order_status" && (
+              <Field label="Status do pedido (separados por vírgula; vazio = todos)">
+                <input value={s.statusFilter} onChange={(e) => set({ statusFilter: e.target.value })} placeholder="ex.: Enviado, Entregue" className={INPUT} />
               </Field>
             )}
             <label className="flex items-center gap-2 text-xs text-foreground">

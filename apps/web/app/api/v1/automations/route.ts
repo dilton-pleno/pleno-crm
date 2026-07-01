@@ -50,7 +50,7 @@ const actionSchema = z.object({
 
 const createSchema = z.object({
   name: z.string().min(1).max(80),
-  trigger_type: z.enum(["new_message", "keyword", "new_contact", "conversation_opened", "abandoned_cart", "schedule"]),
+  trigger_type: z.enum(["new_message", "keyword", "new_contact", "conversation_opened", "abandoned_cart", "order_status", "schedule"]),
   trigger_config: z.record(z.unknown()).default({}),
   active: z.boolean().optional().default(false),
   actions: z.array(actionSchema).default([]),

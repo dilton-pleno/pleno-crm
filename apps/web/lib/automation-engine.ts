@@ -11,6 +11,7 @@ export type AutomationTrigger =
   | "new_contact"
   | "conversation_opened"
   | "abandoned_cart"
+  | "order_status"
   | "schedule";
 
 export interface TriggerContext {
@@ -20,12 +21,16 @@ export interface TriggerContext {
   inboxId?: string | null;
   channelType?: string | null;
   messageContent?: string | null;
+  /** Status atual do pedido (gatilho order_status). */
+  orderStatus?: string | null;
 }
 
 interface TriggerConfig {
   inboxId?: string | null;
   channel?: string; // "whatsapp" | "instagram" | "messenger" | "all"
   keyword?: string;
+  /** Filtro de status do pedido (order_status): lista separada por vírgula; vazio = todos. */
+  status?: string;
   oncePerContact?: boolean;
   hours?: { start: string; end: string; outside?: boolean; days?: number[] };
 }
@@ -74,6 +79,16 @@ function matchesTrigger(a: AutomationWithActions, ctx: TriggerContext): boolean 
     if (!kw) return false;
     if (!(ctx.messageContent ?? "").toLowerCase().includes(kw)) return false;
   }
+  if (a.triggerType === "order_status") {
+    const wanted = (cfg.status ?? "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => s.length > 0);
+    if (wanted.length) {
+      const current = (ctx.orderStatus ?? "").toLowerCase();
+      if (!wanted.some((w) => current.includes(w))) return false;
+    }
+  }
   return true;
 }
 
@@ -85,6 +100,41 @@ async function isDuplicate(a: AutomationWithActions, ctx: TriggerContext): Promi
     select: { id: true },
   });
   return Boolean(prev);
+}
+
+// Substitui tokens {{status}}, {{nome}}, {{pedido}}, {{rastreio}} nas variáveis
+// do template pelos dados do contexto/pedido. Só busca no banco se houver token.
+async function resolveTemplateVars(vars: string[], ctx: TriggerContext): Promise<string[]> {
+  if (!vars.some((v) => v.includes("{{"))) return vars;
+
+  let name = "";
+  let order = "";
+  let tracking = "";
+  if (ctx.contactId) {
+    const contact = await prisma.contact.findUnique({
+      where: { id: ctx.contactId },
+      select: {
+        name: true,
+        orders: { orderBy: { createdAt: "desc" }, take: 1, select: { externalId: true, tracking: true } },
+      },
+    });
+    name = contact?.name ?? "";
+    const o = contact?.orders[0];
+    order = o?.externalId ?? "";
+    tracking = o?.tracking ?? "";
+  }
+  const map: Record<string, string> = {
+    status: ctx.orderStatus ?? "",
+    nome: name,
+    name,
+    pedido: order,
+    order,
+    rastreio: tracking,
+    tracking,
+  };
+  return vars.map((v) =>
+    v.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => map[k.toLowerCase()] ?? "")
+  );
 }
 
 async function executeAction(action: AutomationAction, ctx: TriggerContext): Promise<void> {
@@ -113,9 +163,10 @@ async function executeAction(action: AutomationAction, ctx: TriggerContext): Pro
       });
       if (!conv) return;
       const language = typeof cfg.language === "string" && cfg.language.trim() ? cfg.language.trim() : "pt_BR";
-      const variables = Array.isArray(cfg.variables)
+      const rawVars = Array.isArray(cfg.variables)
         ? cfg.variables.filter((v): v is string => typeof v === "string")
         : [];
+      const variables = await resolveTemplateVars(rawVars, ctx);
       await sendWhatsappTemplate(conv, { templateName: name, language, variables, senderId: null });
       return;
     }
@@ -193,6 +244,7 @@ interface StoredContext {
   inboxId?: string | null;
   channelType?: string | null;
   messageContent?: string | null;
+  orderStatus?: string | null;
 }
 
 // Executa as ações a partir de `startIndex`. Em `wait`, persiste o run como
@@ -237,6 +289,7 @@ async function executeAutomation(a: AutomationWithActions, ctx: TriggerContext):
     inboxId: ctx.inboxId ?? null,
     channelType: ctx.channelType ?? null,
     messageContent: ctx.messageContent ?? null,
+    orderStatus: ctx.orderStatus ?? null,
   };
   const run = await prisma.automationRun.create({
     data: {
@@ -274,6 +327,7 @@ export async function resumeDueRuns(limit = 50): Promise<{ resumed: number }> {
         inboxId: stored.inboxId ?? null,
         channelType: stored.channelType ?? null,
         messageContent: stored.messageContent ?? null,
+        orderStatus: stored.orderStatus ?? null,
       };
       await prisma.automationRun.update({ where: { id: run.id }, data: { status: "running" } });
       await runActions(run.automation.actions, ctx, run.id, run.currentPosition);

@@ -36,6 +36,20 @@ export async function resolveInboxByWhatsappInstance(
   return getDefaultInboxId();
 }
 
+/**
+ * Canal "oficial" para disparos ativos: o Canal ativo mais antigo com provider
+ * "cloud" (WhatsApp API oficial). Retorna null se nenhum estiver configurado —
+ * nesse caso os disparos ativos (status de pedido/campanhas) ficam desligados.
+ */
+export async function getOfficialCloudInboxId(): Promise<string | null> {
+  const inbox = await prisma.inbox.findFirst({
+    where: { active: true, whatsappProvider: "cloud" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  return inbox?.id ?? null;
+}
+
 /** Canal correspondente a um phone_number_id da WhatsApp Cloud API; fallback p/ Padrão. */
 export async function resolveInboxByWhatsappPhoneNumberId(
   phoneNumberId: string | null | undefined
