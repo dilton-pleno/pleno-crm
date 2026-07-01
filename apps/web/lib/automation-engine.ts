@@ -1,6 +1,6 @@
 import type { Automation, AutomationAction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sendOutboundMessage } from "@/lib/outbound";
+import { sendOutboundMessage, sendWhatsappTemplate } from "@/lib/outbound";
 import { userSeesInbox } from "@/lib/visibility";
 import { assertSafeWebhookUrl } from "@/lib/url-guard";
 import { emitEvent } from "@/lib/websocket";
@@ -100,6 +100,23 @@ async function executeAction(action: AutomationAction, ctx: TriggerContext): Pro
       });
       if (!conv) return;
       await sendOutboundMessage(conv, { content: message, senderId: null });
+      return;
+    }
+    case "send_template": {
+      // Disparo ativo via template (WhatsApp API oficial), inclusive fora da
+      // janela de 24h. Requer Canal com provider "cloud".
+      const name = typeof cfg.template_name === "string" ? cfg.template_name.trim() : "";
+      if (!name || !ctx.conversationId) return;
+      const conv = await prisma.conversation.findUnique({
+        where: { id: ctx.conversationId },
+        select: { id: true, inboxId: true, channel: { select: { channelType: true, channelIdentifier: true } } },
+      });
+      if (!conv) return;
+      const language = typeof cfg.language === "string" && cfg.language.trim() ? cfg.language.trim() : "pt_BR";
+      const variables = Array.isArray(cfg.variables)
+        ? cfg.variables.filter((v): v is string => typeof v === "string")
+        : [];
+      await sendWhatsappTemplate(conv, { templateName: name, language, variables, senderId: null });
       return;
     }
     case "add_tag": {

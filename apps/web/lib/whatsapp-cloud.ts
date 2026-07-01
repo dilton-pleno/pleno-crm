@@ -173,6 +173,58 @@ export async function markAsRead(creds: CloudCreds, messageId: string): Promise<
   await postToMessages(creds, { status: "read", message_id: messageId });
 }
 
+// ---- Templates (mensagens ativas fora da janela de 24h) ----
+
+export interface CloudTemplate {
+  name: string;
+  status: string; // "APPROVED" | "PENDING" | "REJECTED" | ...
+  language: string;
+  category: string;
+}
+
+/** Lista os templates do WABA (GET /{waba_id}/message_templates). */
+export async function listTemplates(
+  wabaId: string,
+  accessToken: string
+): Promise<CloudTemplate[]> {
+  const res = await fetch(
+    graphUrl(`${wabaId}/message_templates?fields=name,status,language,category&limit=200`),
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`WhatsApp Cloud listTemplates falhou [${res.status}]: ${body}`);
+  }
+  const json = (await res.json()) as { data?: CloudTemplate[] };
+  return json.data ?? [];
+}
+
+export interface TemplateComponent {
+  type: string; // "body" | "header" | "button"
+  parameters?: { type: string; text?: string }[];
+}
+
+/**
+ * Envia uma mensagem de template. `language` é o code (ex.: "pt_BR"), e
+ * `components` carrega os parâmetros das variáveis (ex.: corpo {{1}}, {{2}}).
+ */
+export async function sendTemplate(
+  creds: CloudCreds,
+  to: string,
+  params: { name: string; language: string; components?: TemplateComponent[] }
+): Promise<{ id: string | null }> {
+  const json = await postToMessages(creds, {
+    to,
+    type: "template",
+    template: {
+      name: params.name,
+      language: { code: params.language },
+      components: params.components ?? [],
+    },
+  });
+  return { id: json.messages?.[0]?.id ?? null };
+}
+
 export interface CloudPhoneInfo {
   verifiedName: string | null;
   displayPhoneNumber: string | null;

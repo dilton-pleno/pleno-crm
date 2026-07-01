@@ -94,3 +94,59 @@ export async function sendOutboundMessage(
   emitEvent("message:new", { conversationId: conversation.id, messageId: message.id });
   return message;
 }
+
+export interface OutboundTemplateOptions {
+  templateName: string;
+  /** Code do idioma do template (ex.: "pt_BR"). */
+  language?: string;
+  /** Variáveis do corpo, na ordem ({{1}}, {{2}}, ...). */
+  variables?: string[];
+  /** Autor do envio; null = sistema (automação/disparo). */
+  senderId?: string | null;
+}
+
+/**
+ * Envia uma mensagem de TEMPLATE (WhatsApp API oficial), única forma de disparo
+ * ativo fora da janela de 24h. Exige Canal com provider "cloud". Persiste a
+ * Message (out) com um resumo legível e emite o evento em tempo real.
+ */
+export async function sendWhatsappTemplate(
+  conversation: OutboundConversation,
+  opts: OutboundTemplateOptions
+) {
+  if (conversation.channel.channelType !== "whatsapp") {
+    throw new Error("Templates disponíveis apenas no WhatsApp");
+  }
+  const ch = await getWhatsappChannel(conversation.inboxId);
+  if (ch.provider !== "cloud") {
+    throw new Error("Templates exigem o WhatsApp API oficial (Cloud) neste Canal");
+  }
+  if (!ch.phoneNumberId || !ch.accessToken) {
+    throw new Error("Canal WhatsApp (API oficial) sem phone_number_id/token configurado");
+  }
+
+  const variables = (opts.variables ?? []).filter((v) => v.length > 0);
+  const components: cloud.TemplateComponent[] = variables.length
+    ? [{ type: "body", parameters: variables.map((text) => ({ type: "text", text })) }]
+    : [];
+
+  const result = await cloud.sendTemplate(
+    { phoneNumberId: ch.phoneNumberId, accessToken: ch.accessToken },
+    conversation.channel.channelIdentifier,
+    { name: opts.templateName, language: opts.language ?? "pt_BR", components }
+  );
+
+  const content = `[modelo: ${opts.templateName}]${variables.length ? ` ${variables.join(" · ")}` : ""}`;
+  const message = await prisma.message.create({
+    data: {
+      conversationId: conversation.id,
+      direction: "out",
+      content,
+      senderId: opts.senderId ?? null,
+      externalId: result.id,
+    },
+  });
+
+  emitEvent("message:new", { conversationId: conversation.id, messageId: message.id });
+  return message;
+}

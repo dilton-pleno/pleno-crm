@@ -49,7 +49,7 @@ export async function GET(
 
 const actionSchema = z.object({
   position: z.number().int(),
-  action_type: z.enum(["send_message", "add_tag", "assign_agent", "move_kanban", "webhook", "wait"]),
+  action_type: z.enum(["send_message", "send_template", "add_tag", "assign_agent", "move_kanban", "webhook", "wait"]),
   action_config: z.record(z.unknown()).default({}),
 });
 

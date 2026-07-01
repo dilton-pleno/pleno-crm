@@ -44,6 +44,7 @@ const TRIGGERS = Object.keys(TRIGGER_LABELS);
 
 const ACTION_LABELS: Record<string, string> = {
   send_message: "Enviar mensagem",
+  send_template: "Enviar template (oficial)",
   add_tag: "Adicionar etiqueta",
   assign_agent: "Atribuir agente",
   move_kanban: "Mover no Kanban",
@@ -54,6 +55,7 @@ const ACTION_TYPES = Object.keys(ACTION_LABELS);
 
 const ACTION_ICON: Record<string, React.ElementType> = {
   send_message: MessageSquare,
+  send_template: MessageSquare,
   add_tag: TagIcon,
   assign_agent: UserPlus,
   move_kanban: LayoutGrid,
@@ -193,6 +195,11 @@ function fromAutomation(a: AutomationDetail): BuilderState {
       action_type: ac.action_type,
       config: {
         message: String(ac.action_config.message ?? ""),
+        template_name: String(ac.action_config.template_name ?? ""),
+        language: String(ac.action_config.language ?? ""),
+        variables: Array.isArray(ac.action_config.variables)
+          ? (ac.action_config.variables as unknown[]).map((v) => String(v)).join(", ")
+          : String(ac.action_config.variables ?? ""),
         tag: String(ac.action_config.tag ?? ""),
         user_id: String(ac.action_config.user_id ?? ""),
         stage_id: String(ac.action_config.stage_id ?? ""),
@@ -219,6 +226,14 @@ function toPayload(s: BuilderState) {
   const actions = s.actions.map((a, i) => {
     const cfg: Record<string, unknown> = {};
     if (a.action_type === "send_message") cfg.message = a.config.message ?? "";
+    else if (a.action_type === "send_template") {
+      cfg.template_name = (a.config.template_name ?? "").trim();
+      cfg.language = (a.config.language ?? "").trim() || "pt_BR";
+      cfg.variables = (a.config.variables ?? "")
+        .split(",")
+        .map((v) => v.trim())
+        .filter((v) => v.length > 0);
+    }
     else if (a.action_type === "add_tag") cfg.tag = a.config.tag ?? "";
     else if (a.action_type === "assign_agent") cfg.user_id = a.config.user_id ?? "";
     else if (a.action_type === "move_kanban") cfg.stage_id = a.config.stage_id ?? "";
@@ -504,6 +519,21 @@ function AutomationBuilder({
               {a.action_type === "send_message" && (
                 <textarea value={a.config.message ?? ""} onChange={(e) => setActionConfig(i, "message", e.target.value)}
                   rows={3} placeholder="Mensagem a enviar…" className={`${INPUT} resize-none`} />
+              )}
+              {a.action_type === "send_template" && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <input value={a.config.template_name ?? ""} onChange={(e) => setActionConfig(i, "template_name", e.target.value)}
+                      placeholder="Nome do template aprovado" className={`${INPUT} flex-1`} />
+                    <input value={a.config.language ?? ""} onChange={(e) => setActionConfig(i, "language", e.target.value)}
+                      placeholder="pt_BR" className={`${INPUT} w-28`} />
+                  </div>
+                  <input value={a.config.variables ?? ""} onChange={(e) => setActionConfig(i, "variables", e.target.value)}
+                    placeholder="Variáveis do corpo, separadas por vírgula ({{1}}, {{2}}…)" className={INPUT} />
+                  <p className="text-[10px] text-muted-foreground">
+                    Disparo ativo via WhatsApp API oficial (Canal Cloud). Funciona fora da janela de 24h.
+                  </p>
+                </div>
               )}
               {a.action_type === "add_tag" && (
                 <>
