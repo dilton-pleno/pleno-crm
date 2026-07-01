@@ -32,6 +32,16 @@ export function parseRange(params: URLSearchParams): Range {
 }
 
 /**
+ * Filtro de loja para as consultas de analytics. Quando `?store=<id>` está
+ * presente, restringe a `storeIntegrationId`; ausente = agregado (todas as
+ * lojas). O fragmento espalha em wheres de CampaignMetric/Ga4Metric/Order.
+ */
+export function storeFilter(params: URLSearchParams): { storeIntegrationId?: string } {
+  const store = params.get("store");
+  return store ? { storeIntegrationId: store } : {};
+}
+
+/**
  * Período imediatamente anterior, de mesma duração, para comparação.
  */
 export function previousRange(range: Range): { start: Date; end: Date } {

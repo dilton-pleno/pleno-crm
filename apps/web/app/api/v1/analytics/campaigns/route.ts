@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import {
   parseRange,
   aggregateByCampaign,
+  storeFilter,
   type CampaignAgg,
   type CampaignAggRow,
 } from "@/lib/analytics-query";
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     where: {
       date: { gte: range.start, lte: range.end },
       ...(platform ? { platform } : {}),
+      ...storeFilter(params),
     },
     select: {
       platform: true,

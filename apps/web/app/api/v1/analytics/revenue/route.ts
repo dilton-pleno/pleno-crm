@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { parseRange, dec } from "@/lib/analytics-query";
+import { parseRange, dec, storeFilter } from "@/lib/analytics-query";
 
 // Faturamento (Wbuy) por período, para cruzar com investimento em ads.
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -11,7 +11,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const range = parseRange(request.nextUrl.searchParams);
 
   const agg = await prisma.order.aggregate({
-    where: { createdAt: { gte: range.start, lte: range.end } },
+    where: {
+      createdAt: { gte: range.start, lte: range.end },
+      ...storeFilter(request.nextUrl.searchParams),
+    },
     _sum: { total: true },
     _count: { id: true },
   });

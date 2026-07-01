@@ -16,7 +16,8 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { Bell, ChevronDown, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
+import { Bell, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Megaphone } from "lucide-react";
+import { useEcommerceStore, StoreSelector } from "@/components/ecommerce/use-store";
 
 type PresetKey = "today" | "yesterday" | "7d" | "30d" | "custom";
 
@@ -96,11 +97,13 @@ export function CampanhasClient() {
   const [loading, setLoading] = useState(true);
 
   const [sort, setSort] = useState<{ key: string; order: "asc" | "desc" }>({ key: "spend", order: "desc" });
+  const { stores, storeId, setStoreId } = useEcommerceStore();
 
-  const qs = useMemo(
-    () => `start=${range.start}&end=${range.end}`,
-    [range.start, range.end]
-  );
+  const qs = useMemo(() => {
+    const p = new URLSearchParams({ start: range.start, end: range.end });
+    if (storeId) p.set("store", storeId);
+    return p.toString();
+  }, [range.start, range.end, storeId]);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -146,6 +149,7 @@ export function CampanhasClient() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-lg font-semibold text-foreground">Marketing — Anúncios</h1>
         <div className="flex items-center gap-2 flex-wrap">
+          <StoreSelector stores={stores} storeId={storeId} setStoreId={setStoreId} />
           <PeriodSelector
             preset={preset}
             range={range}
@@ -164,6 +168,12 @@ export function CampanhasClient() {
             />
             Comparar
           </label>
+          <Link
+            href="/campanhas/contas"
+            className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent text-foreground"
+          >
+            <Megaphone className="w-3.5 h-3.5" /> Contas
+          </Link>
           <Link
             href="/campanhas/alertas"
             className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent text-foreground"

@@ -21,6 +21,16 @@ export async function resolveAdStoreId(
       where: { platform_accountId: { platform, accountId } },
     });
     if (map) return map.storeIntegrationId;
+
+    // Conta vista pela 1ª vez: registra já vinculada à loja padrão, para poder
+    // ser reatribuída na tela. (catch silencioso p/ corrida de unique.)
+    const def = await getDefaultStoreIntegrationId();
+    if (def) {
+      await prisma.adAccountStore
+        .create({ data: { platform, accountId, storeIntegrationId: def } })
+        .catch(() => undefined);
+    }
+    return def;
   }
   return getDefaultStoreIntegrationId();
 }

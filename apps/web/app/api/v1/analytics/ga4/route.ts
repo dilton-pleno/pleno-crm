@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
-import { parseRange } from "@/lib/analytics-query";
+import { parseRange, storeFilter } from "@/lib/analytics-query";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const guard = await requireAccess("campanhas");
@@ -10,7 +10,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const range = parseRange(request.nextUrl.searchParams);
 
   const rows = await prisma.ga4Metric.findMany({
-    where: { date: { gte: range.start, lte: range.end } },
+    where: {
+      date: { gte: range.start, lte: range.end },
+      ...storeFilter(request.nextUrl.searchParams),
+    },
     orderBy: { date: "asc" },
   });
 

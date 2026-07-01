@@ -7,6 +7,7 @@ import {
   summarize,
   changePct,
   dec,
+  storeFilter,
   type CampaignRow,
 } from "@/lib/analytics-query";
 
@@ -27,9 +28,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const range = parseRange(request.nextUrl.searchParams);
   const compare = request.nextUrl.searchParams.get("compare") === "true";
+  const store = storeFilter(request.nextUrl.searchParams);
 
   const rows = await prisma.campaignMetric.findMany({
-    where: { date: { gte: range.start, lte: range.end } },
+    where: { date: { gte: range.start, lte: range.end }, ...store },
     select: { ...SELECT, platform: true, date: true },
   });
 
@@ -69,7 +71,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (compare) {
     const prev = previousRange(range);
     const prevRows = await prisma.campaignMetric.findMany({
-      where: { date: { gte: prev.start, lte: prev.end } },
+      where: { date: { gte: prev.start, lte: prev.end }, ...store },
       select: SELECT,
     });
     const prevSummary = summarize(prevRows as CampaignRow[]);

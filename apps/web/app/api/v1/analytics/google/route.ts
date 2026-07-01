@@ -5,6 +5,7 @@ import {
   parseRange,
   summarize,
   aggregateByCampaign,
+  storeFilter,
   type CampaignRow,
   type CampaignAggRow,
 } from "@/lib/analytics-query";
@@ -16,7 +17,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const range = parseRange(request.nextUrl.searchParams);
 
   const rows = await prisma.campaignMetric.findMany({
-    where: { platform: "google", date: { gte: range.start, lte: range.end } },
+    where: {
+      platform: "google",
+      date: { gte: range.start, lte: range.end },
+      ...storeFilter(request.nextUrl.searchParams),
+    },
     select: {
       platform: true,
       campaignId: true,
