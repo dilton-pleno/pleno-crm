@@ -52,13 +52,14 @@ async function dispatchInboxFor(trigger: TriggerContext["trigger"]): Promise<str
 export async function runOrderStatusDispatch(input: {
   orderExternalId: string;
   status: string;
+  storeIntegrationId: string;
 }): Promise<void> {
   try {
     const inboxId = await dispatchInboxFor("order_status");
     if (!inboxId) return;
 
     const order = await prisma.order.findUnique({
-      where: { externalId: input.orderExternalId },
+      where: { storeIntegrationId_externalId: { storeIntegrationId: input.storeIntegrationId, externalId: input.orderExternalId } },
       select: { contact: { select: { id: true, phone: true, secondaryPhone: true } } },
     });
     if (!order?.contact) return;
@@ -86,13 +87,14 @@ export async function runOrderStatusDispatch(input: {
  */
 export async function runPurchaseCountDispatch(input: {
   orderExternalId: string;
+  storeIntegrationId: string;
 }): Promise<void> {
   try {
     const inboxId = await dispatchInboxFor("purchase_count");
     if (!inboxId) return;
 
     const order = await prisma.order.findUnique({
-      where: { externalId: input.orderExternalId },
+      where: { storeIntegrationId_externalId: { storeIntegrationId: input.storeIntegrationId, externalId: input.orderExternalId } },
       select: { contactId: true, contact: { select: { id: true, phone: true, secondaryPhone: true } } },
     });
     if (!order?.contact) return;

@@ -112,7 +112,7 @@ async function findOrCreateContact(cliente: WbuyOrder["cliente"]): Promise<strin
  * Upsert idempotente de um pedido Wbuy no CRM (chave: external_id), vinculando
  * ao contato. Usado pelo webhook e pela sincronização.
  */
-export async function upsertWbuyOrder(order: WbuyOrder): Promise<void> {
+export async function upsertWbuyOrder(order: WbuyOrder, storeIntegrationId: string): Promise<void> {
   const contactId = await findOrCreateContact(order.cliente);
 
   const items: OrderItem[] = (order.produtos ?? []).map((p) => ({
@@ -133,6 +133,7 @@ export async function upsertWbuyOrder(order: WbuyOrder): Promise<void> {
 
   const data = {
     contactId,
+    storeIntegrationId,
     platform: "wbuy",
     status,
     total,
@@ -144,7 +145,7 @@ export async function upsertWbuyOrder(order: WbuyOrder): Promise<void> {
   };
 
   await prisma.order.upsert({
-    where: { externalId },
+    where: { storeIntegrationId_externalId: { storeIntegrationId, externalId } },
     update: data,
     create: { ...data, externalId, createdAt },
   });
@@ -156,10 +157,11 @@ export async function upsertWbuyOrder(order: WbuyOrder): Promise<void> {
  */
 export async function updateWbuyOrderStatus(
   pedidoId: string,
-  statusNome: string
+  statusNome: string,
+  storeIntegrationId: string
 ): Promise<void> {
   await prisma.order.updateMany({
-    where: { externalId: String(pedidoId) },
+    where: { externalId: String(pedidoId), storeIntegrationId },
     data: { status: statusNome, syncedAt: new Date() },
   });
 }
@@ -167,7 +169,7 @@ export async function updateWbuyOrderStatus(
 /**
  * Upsert de carrinho abandonado (webhook abandoned_cart). Chave: id_envio.
  */
-export async function upsertAbandonedCart(cart: WbuyAbandonedCart): Promise<void> {
+export async function upsertAbandonedCart(cart: WbuyAbandonedCart, storeIntegrationId: string): Promise<void> {
   if (!cart.id_envio) return;
 
   const produtos = cart.produtos ?? [];
@@ -180,6 +182,7 @@ export async function upsertAbandonedCart(cart: WbuyAbandonedCart): Promise<void
   }
 
   const data = {
+    storeIntegrationId,
     customerName: cart.cliente?.nome ?? null,
     customerEmail: cart.cliente?.email ?? null,
     customerPhone: cart.cliente?.telefone ? digits(cart.cliente.telefone) : null,
@@ -189,7 +192,7 @@ export async function upsertAbandonedCart(cart: WbuyAbandonedCart): Promise<void
   };
 
   await prisma.abandonedCart.upsert({
-    where: { externalId: String(cart.id_envio) },
+    where: { storeIntegrationId_externalId: { storeIntegrationId, externalId: String(cart.id_envio) } },
     update: data,
     create: { ...data, externalId: String(cart.id_envio) },
   });

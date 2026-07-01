@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireInternalSecret } from "@/lib/internal-auth";
 import { getWbuyCreds } from "@/lib/wbuy-config";
+import { getDefaultStoreIntegrationId } from "@/lib/store-integration";
 import { getReviews } from "@/lib/wbuy";
 import { syncReviews } from "@/lib/wbuy-review";
 
@@ -11,16 +12,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (unauthorized) return unauthorized;
 
   const creds = await getWbuyCreds();
-  if (!creds) {
+  const storeId = await getDefaultStoreIntegrationId();
+  if (!creds || !storeId) {
     return NextResponse.json(
-      { error: { code: "NOT_CONFIGURED", message: "Credenciais Wbuy não configuradas" } },
+      { error: { code: "NOT_CONFIGURED", message: "Loja/credenciais Wbuy não configuradas" } },
       { status: 400 }
     );
   }
 
   try {
     const reviews = await getReviews(creds, { limit: "0,100" });
-    const result = await syncReviews(reviews);
+    const result = await syncReviews(reviews, storeId);
     return NextResponse.json({ data: result });
   } catch (err) {
     console.error("[sync/wbuy-reviews] Erro:", err);

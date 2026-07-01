@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
 import { getWbuyCreds } from "@/lib/wbuy-config";
+import { getDefaultStoreIntegrationId } from "@/lib/store-integration";
 import { getOrders } from "@/lib/wbuy";
 import { upsertWbuyOrder } from "@/lib/wbuy-order";
 
@@ -11,9 +12,10 @@ export async function POST(): Promise<NextResponse> {
   if (!guard.ok) return guard.response;
 
   const creds = await getWbuyCreds();
-  if (!creds) {
+  const storeId = await getDefaultStoreIntegrationId();
+  if (!creds || !storeId) {
     return NextResponse.json(
-      { error: { code: "NOT_CONFIGURED", message: "Credenciais Wbuy não configuradas" } },
+      { error: { code: "NOT_CONFIGURED", message: "Loja/credenciais Wbuy não configuradas" } },
       { status: 400 }
     );
   }
@@ -27,7 +29,7 @@ export async function POST(): Promise<NextResponse> {
     for (const order of orders) {
       if (!order?.id) continue;
       try {
-        await upsertWbuyOrder(order);
+        await upsertWbuyOrder(order, storeId);
         synced++;
       } catch (err) {
         console.error(`[wbuy] Falha ao sincronizar pedido ${order.id}:`, err);

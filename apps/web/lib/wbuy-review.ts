@@ -13,13 +13,13 @@ function parseDate(s: string | undefined): Date | null {
  * Sincroniza avaliações e dispara alerta no sino para cada avaliação NOVA
  * (que ainda não existia no banco). Retorna a contagem total e de novas.
  */
-export async function syncReviews(reviews: WbuyReviewRaw[]): Promise<{ synced: number; created: number }> {
+export async function syncReviews(reviews: WbuyReviewRaw[], storeIntegrationId: string): Promise<{ synced: number; created: number }> {
   const valid = reviews.filter((r) => r.id);
   if (valid.length === 0) return { synced: 0, created: 0 };
 
   const ids = valid.map((r) => String(r.id));
   const existing = await prisma.wbuyReview.findMany({
-    where: { externalId: { in: ids } },
+    where: { externalId: { in: ids }, storeIntegrationId },
     select: { externalId: true },
   });
   const known = new Set(existing.map((e) => e.externalId));
@@ -34,6 +34,7 @@ export async function syncReviews(reviews: WbuyReviewRaw[]): Promise<{ synced: n
     const customerName = r.nome ?? null;
 
     const data = {
+      storeIntegrationId,
       productId: r.produto_id ?? null,
       productName,
       customerName,
@@ -44,7 +45,7 @@ export async function syncReviews(reviews: WbuyReviewRaw[]): Promise<{ synced: n
     };
 
     await prisma.wbuyReview.upsert({
-      where: { externalId },
+      where: { storeIntegrationId_externalId: { storeIntegrationId, externalId } },
       update: data,
       create: { ...data, externalId, alertedAt: isNew ? new Date() : null },
     });

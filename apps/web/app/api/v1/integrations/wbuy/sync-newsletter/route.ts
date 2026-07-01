@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/api-auth";
 import { getWbuyCreds } from "@/lib/wbuy-config";
+import { getDefaultStoreIntegrationId } from "@/lib/store-integration";
 import { getNewsletter } from "@/lib/wbuy";
 import { syncNewsletter } from "@/lib/wbuy-newsletter";
 
@@ -13,9 +14,10 @@ export async function POST(): Promise<NextResponse> {
   if (!guard.ok) return guard.response;
 
   const creds = await getWbuyCreds();
-  if (!creds) {
+  const storeId = await getDefaultStoreIntegrationId();
+  if (!creds || !storeId) {
     return NextResponse.json(
-      { error: { code: "NOT_CONFIGURED", message: "Credenciais Wbuy não configuradas" } },
+      { error: { code: "NOT_CONFIGURED", message: "Loja/credenciais Wbuy não configuradas" } },
       { status: 400 }
     );
   }
@@ -26,7 +28,7 @@ export async function POST(): Promise<NextResponse> {
       const offset = page * PAGE_SIZE;
       const subs = await getNewsletter(creds, { limit: `${offset},${PAGE_SIZE}` });
       if (subs.length === 0) break;
-      synced += await syncNewsletter(subs);
+      synced += await syncNewsletter(subs, storeId);
       if (subs.length < PAGE_SIZE) break;
     }
     return NextResponse.json({ data: { synced } });

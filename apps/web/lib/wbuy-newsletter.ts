@@ -10,12 +10,13 @@ function parseDate(s: string | undefined): Date | null {
 /**
  * Upsert dos inscritos da newsletter (chave: email). Paginado pelo chamador.
  */
-export async function syncNewsletter(subs: WbuyNewsletterRaw[]): Promise<number> {
+export async function syncNewsletter(subs: WbuyNewsletterRaw[], storeIntegrationId: string): Promise<number> {
   let synced = 0;
   for (const s of subs) {
     const email = s.email?.trim().toLowerCase();
     if (!email) continue;
     const data = {
+      storeIntegrationId,
       name: s.nome ?? null,
       phone: s.telefone ? s.telefone.replace(/\D/g, "") : null,
       gender: s.genero ?? null,
@@ -24,7 +25,7 @@ export async function syncNewsletter(subs: WbuyNewsletterRaw[]): Promise<number>
       syncedAt: new Date(),
     };
     await prisma.newsletterSubscriber.upsert({
-      where: { email },
+      where: { storeIntegrationId_email: { storeIntegrationId, email } },
       update: data,
       create: { ...data, email },
     });

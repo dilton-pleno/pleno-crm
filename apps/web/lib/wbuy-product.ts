@@ -29,11 +29,12 @@ function summarizeStock(estoque: WbuyProductRaw["estoque"]): {
  * Upsert de um produto ativo da Wbuy (chave: external_id). Guarda só o que é
  * útil para cruzar vendas e SEO.
  */
-export async function upsertWbuyProduct(p: WbuyProductRaw): Promise<void> {
+export async function upsertWbuyProduct(p: WbuyProductRaw, storeIntegrationId: string): Promise<void> {
   if (!p.id) return;
   const { price, stock, views } = summarizeStock(p.estoque);
 
   const data = {
+    storeIntegrationId,
     cod: p.cod ?? null,
     name: p.produto ?? "Produto",
     description: p.descricao ?? null,
@@ -50,7 +51,7 @@ export async function upsertWbuyProduct(p: WbuyProductRaw): Promise<void> {
   };
 
   await prisma.wbuyProduct.upsert({
-    where: { externalId: String(p.id) },
+    where: { storeIntegrationId_externalId: { storeIntegrationId, externalId: String(p.id) } },
     update: data,
     create: { ...data, externalId: String(p.id) },
   });
