@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Prisma, type Integration } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/crypto";
@@ -6,7 +7,7 @@ import { encrypt, decrypt } from "@/lib/crypto";
 // em Integrações e atribuídas a um Canal (1:1). Segredos cifrados em config JSON;
 // identificadores de roteamento (instance/phone/page/ig) em colunas indexadas.
 
-export type IntegrationType = "whatsapp" | "meta";
+export type IntegrationType = "whatsapp" | "meta" | "ecommerce";
 export type WhatsappProvider = "evolution" | "cloud";
 
 interface WaStored {
@@ -16,6 +17,11 @@ interface WaStored {
 }
 interface MetaStored {
   accessTokenEnc?: string;
+}
+interface EcomStored {
+  apiUser?: string;
+  apiSecretEnc?: string;
+  webhookSecretEnc?: string;
 }
 
 function dec(v: string | undefined): string | null {
@@ -71,6 +77,7 @@ export interface IntegrationInput {
   type?: IntegrationType;
   name?: string;
   provider?: WhatsappProvider | null;
+  platform?: string | null; // ecommerce: "wbuy"
   active?: boolean;
   // roteamento
   waInstance?: string | null;
@@ -81,6 +88,9 @@ export interface IntegrationInput {
   accessToken?: string;
   wabaId?: string;
   verifyToken?: string;
+  // ecommerce
+  apiUser?: string | null;
+  apiSecret?: string;
 }
 
 const norm = (v: string | null | undefined): string | null | undefined =>
@@ -92,6 +102,15 @@ function buildConfig(
   current: Prisma.JsonValue | null,
   input: IntegrationInput
 ): Prisma.InputJsonValue | undefined {
+  if (type === "ecommerce") {
+    const touched = input.apiUser !== undefined || input.apiSecret !== undefined;
+    if (!touched) return undefined;
+    const next: EcomStored = { ...((current as EcomStored | null) ?? {}) };
+    if (input.apiUser !== undefined) next.apiUser = input.apiUser?.trim() || undefined;
+    if (input.apiSecret) next.apiSecretEnc = encrypt(input.apiSecret);
+    return next as unknown as Prisma.InputJsonValue;
+  }
+
   const touched =
     input.accessToken !== undefined ||
     input.wabaId !== undefined ||
@@ -108,6 +127,10 @@ function buildConfig(
   if (input.verifyToken) next.verifyTokenEnc = encrypt(input.verifyToken);
   if (input.wabaId !== undefined) next.wabaId = input.wabaId.trim() || undefined;
   return next as unknown as Prisma.InputJsonValue;
+}
+
+function normalizeType(t: IntegrationType | undefined): IntegrationType {
+  return t === "meta" || t === "ecommerce" ? t : "whatsapp";
 }
 
 const withInbox = {
@@ -133,14 +156,21 @@ export function getIntegrationFull(id: string) {
   return prisma.integration.findUnique({ where: { id }, include: withInbox });
 }
 
+function maskUser(u: string | undefined): string | null {
+  if (!u) return null;
+  return u.length > 8 ? `${u.slice(0, 4)}…${u.slice(-4)}` : "••••";
+}
+
 /** Serializa uma integração (com Canal atribuído) sem expor segredos. */
 export function serializeIntegration(i: IntegrationWithInbox) {
   const assigned = i.inboxWhatsapp ?? i.inboxMeta ?? null;
+  const ecom = (i.config as EcomStored | null) ?? {};
   return {
     id: i.id,
     type: i.type,
     name: i.name,
     provider: i.provider,
+    platform: i.platform,
     active: i.active,
     wa_instance: i.waInstance,
     wa_phone_number_id: i.waPhoneNumberId,
@@ -148,23 +178,36 @@ export function serializeIntegration(i: IntegrationWithInbox) {
     meta_page_id: i.metaPageId,
     meta_ig_id: i.metaIgId,
     has_token: integrationHasToken(i.config),
+    // ecommerce
+    api_user_masked: maskUser(ecom.apiUser),
+    has_secret: Boolean(ecom.apiSecretEnc),
     assigned_inbox: assigned ? { id: assigned.id, name: assigned.name } : null,
   };
 }
 
 export async function createIntegration(input: IntegrationInput): Promise<Integration> {
-  const type = input.type === "meta" ? "meta" : "whatsapp";
+  const type = normalizeType(input.type);
+
+  let config = buildConfig(type, null, input);
+  // E-commerce nasce com um webhookSecret próprio (para a URL de webhook da loja).
+  if (type === "ecommerce") {
+    const base = ((config as EcomStored | undefined) ?? {}) as EcomStored;
+    base.webhookSecretEnc = encrypt(randomUUID());
+    config = base as unknown as Prisma.InputJsonValue;
+  }
+
   return prisma.integration.create({
     data: {
       type,
       name: (input.name ?? "").trim() || "Integração",
       provider: type === "whatsapp" ? (input.provider === "cloud" ? "cloud" : "evolution") : null,
+      platform: type === "ecommerce" ? norm(input.platform) ?? "wbuy" : null,
       active: input.active ?? true,
       waInstance: norm(input.waInstance) ?? null,
       waPhoneNumberId: norm(input.waPhoneNumberId) ?? null,
       metaPageId: norm(input.metaPageId) ?? null,
       metaIgId: norm(input.metaIgId) ?? null,
-      config: buildConfig(type, null, input) ?? Prisma.JsonNull,
+      config: config ?? Prisma.JsonNull,
     },
   });
 }

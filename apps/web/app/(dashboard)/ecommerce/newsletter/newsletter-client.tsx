@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail, CheckCircle2 } from "lucide-react";
+import { useEcommerceStore, StoreSelector } from "@/components/ecommerce/use-store";
 
 interface Subscriber {
   id: string;
@@ -26,12 +27,14 @@ export function NewsletterClient() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const { stores, storeId, setStoreId } = useEcommerceStore();
 
   const fetchSubs = useCallback(async () => {
     setLoading(true);
     try {
       const qs = new URLSearchParams({ page: String(page), limit: String(PER_PAGE) });
       if (search) qs.set("search", search);
+      if (storeId) qs.set("store", storeId);
       const res = await fetch(`/api/v1/ecommerce/newsletter?${qs.toString()}`);
       if (res.ok) {
         const json = (await res.json()) as {
@@ -45,7 +48,7 @@ export function NewsletterClient() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, storeId]);
 
   useEffect(() => {
     void fetchSubs();
@@ -60,6 +63,7 @@ export function NewsletterClient() {
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <h1 className="text-lg font-semibold text-foreground">Newsletter</h1>
+        <div className="ml-auto"><StoreSelector stores={stores} storeId={storeId} setStoreId={setStoreId} /></div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 shrink-0">

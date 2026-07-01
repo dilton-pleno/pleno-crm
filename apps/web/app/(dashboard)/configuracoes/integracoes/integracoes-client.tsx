@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { RefreshCw, X, QrCode, MessageCircle, CheckCircle2, AlertCircle, History, ArrowLeft } from "lucide-react";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { WbuyCard } from "./wbuy-card";
 import { MetaAdsCard } from "./meta-ads-card";
 import { GoogleCard } from "./google-card";
 import { IntegrationsManager } from "./integrations-manager";
@@ -296,10 +295,10 @@ export function IntegracoesClient({ currentUserId, canManage, isAdmin }: Props) 
       </div>
       )}
 
-      {/* Cards de integração — gestão de credenciais só para Admin */}
+      {/* Cards de integração — gestão de credenciais só para Admin.
+          E-commerce (Wbuy) agora é gerenciado como instância no IntegrationsManager. */}
       {isAdmin && <MetaAdsCard />}
       {isAdmin && <GoogleCard />}
-      {isAdmin && <WbuyCard />}
 
       {showModal && (
         <QrCodeModal qrcode={qrcode} onClose={closeModal} />

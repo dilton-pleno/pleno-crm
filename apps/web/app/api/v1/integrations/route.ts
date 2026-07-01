@@ -13,9 +13,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 const createSchema = z.object({
-  type: z.enum(["whatsapp", "meta"]),
+  type: z.enum(["whatsapp", "meta", "ecommerce"]),
   name: z.string().min(1).max(80),
   provider: z.enum(["evolution", "cloud"]).optional(),
+  platform: z.string().max(40).optional(),
   active: z.boolean().optional(),
   wa_instance: z.string().max(120).optional(),
   wa_phone_number_id: z.string().max(120).optional(),
@@ -24,6 +25,8 @@ const createSchema = z.object({
   meta_ig_id: z.string().max(120).optional(),
   access_token: z.string().optional(),
   verify_token: z.string().max(200).optional(),
+  api_user: z.string().max(200).optional(),
+  api_secret: z.string().optional(),
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -42,6 +45,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     type: d.type,
     name: d.name,
     provider: d.provider,
+    platform: d.platform,
     active: d.active,
     waInstance: d.wa_instance,
     waPhoneNumberId: d.wa_phone_number_id,
@@ -50,11 +54,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     accessToken: d.access_token,
     wabaId: d.waba_id,
     verifyToken: d.verify_token,
+    apiUser: d.api_user,
+    apiSecret: d.api_secret,
   };
 
   const created = await createIntegration(input);
   // Recarrega no shape completo (assigned_inbox nulo por ser recém-criada).
-  const row = (await listIntegrations(created.type as "whatsapp" | "meta")).find((x) => x.id === created.id);
+  const row = (await listIntegrations(created.type as "whatsapp" | "meta" | "ecommerce")).find((x) => x.id === created.id);
   if (!row) {
     return NextResponse.json({ error: { code: "INTERNAL", message: "Falha ao criar integração" } }, { status: 500 });
   }

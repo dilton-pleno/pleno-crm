@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -36,6 +37,8 @@ const patchSchema = z.object({
   meta_ig_id: z.string().max(120).optional().nullable(),
   access_token: z.string().optional(),
   verify_token: z.string().max(200).optional(),
+  api_user: z.string().max(200).optional().nullable(),
+  api_secret: z.string().optional(),
 });
 
 export async function PATCH(
@@ -65,6 +68,8 @@ export async function PATCH(
     accessToken: d.access_token,
     wabaId: d.waba_id,
     verifyToken: d.verify_token,
+    apiUser: d.api_user,
+    apiSecret: d.api_secret,
   };
 
   const updated = await updateIntegration(id, input);
@@ -97,6 +102,17 @@ export async function DELETE(
     );
   }
 
-  await prisma.integration.delete({ where: { id } });
+  try {
+    await prisma.integration.delete({ where: { id } });
+  } catch (err) {
+    // FK RESTRICT (loja e-commerce com pedidos/produtos/etc. vinculados).
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
+      return NextResponse.json(
+        { error: { code: "CONFLICT", message: "Loja com dados (pedidos/produtos) não pode ser excluída." } },
+        { status: 409 }
+      );
+    }
+    throw err;
+  }
   return NextResponse.json({ data: { id } });
 }

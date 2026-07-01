@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { resolveEcommerceStoreId } from "@/lib/store-integration";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const guard = await requireAccess("ecommerce");
@@ -10,15 +12,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const page = Math.max(1, parseInt(params.get("page") ?? "1", 10));
   const limit = Math.min(100, Math.max(1, parseInt(params.get("limit") ?? "20", 10)));
   const search = params.get("search")?.trim();
+  const storeId = await resolveEcommerceStoreId(params.get("store"));
 
-  const where = search
-    ? {
-        OR: [
-          { email: { contains: search, mode: "insensitive" as const } },
-          { name: { contains: search, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
+  const where: Prisma.NewsletterSubscriberWhereInput = {
+    storeIntegrationId: storeId,
+    ...(search
+      ? {
+          OR: [
+            { email: { contains: search, mode: "insensitive" as const } },
+            { name: { contains: search, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
 
   const [subs, total, active] = await Promise.all([
     prisma.newsletterSubscriber.findMany({
@@ -28,7 +34,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       take: limit,
     }),
     prisma.newsletterSubscriber.count({ where }),
-    prisma.newsletterSubscriber.count({ where: { subscribed: true } }),
+    prisma.newsletterSubscriber.count({ where: { storeIntegrationId: storeId, subscribed: true } }),
   ]);
 
   return NextResponse.json({

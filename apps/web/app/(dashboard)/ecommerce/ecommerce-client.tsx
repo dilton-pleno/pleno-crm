@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ShoppingCart, DollarSign, Package, ShoppingBag, Star, Mail, Truck } from "lucide-react";
+import { useEcommerceStore, StoreSelector } from "@/components/ecommerce/use-store";
 
 interface RecentOrder {
   id: string;
@@ -64,31 +65,34 @@ export function EcommerceClient() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const { stores, storeId, setStoreId } = useEcommerceStore();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const s = storeId ? `?store=${storeId}` : "";
       const [ov, ab] = await Promise.all([
-        fetch("/api/v1/ecommerce/overview").then((r) => r.json()),
-        fetch("/api/v1/ecommerce/abandoned-carts").then((r) => r.json()),
+        fetch(`/api/v1/ecommerce/overview${s}`).then((r) => r.json()),
+        fetch(`/api/v1/ecommerce/abandoned-carts${s}`).then((r) => r.json()),
       ]);
       setData(ov.data ?? null);
       setCarts(ab.data ?? null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [storeId]);
 
   const fetchOrders = useCallback(async () => {
     const qs = new URLSearchParams({ page: String(page), limit: String(PER_PAGE) });
     if (search) qs.set("search", search);
+    if (storeId) qs.set("store", storeId);
     const res = await fetch(`/api/v1/ecommerce/orders?${qs.toString()}`);
     if (res.ok) {
       const json = (await res.json()) as { data: RecentOrder[]; meta: { total: number } };
       setOrders(json.data);
       setTotal(json.meta.total);
     }
-  }, [page, search]);
+  }, [page, search, storeId]);
 
   useEffect(() => {
     void fetchData();
@@ -105,6 +109,7 @@ export function EcommerceClient() {
       <div className="flex items-center justify-between shrink-0">
         <h1 className="text-lg font-semibold text-foreground">Ecommerce</h1>
         <div className="flex items-center gap-2">
+          <StoreSelector stores={stores} storeId={storeId} setStoreId={setStoreId} />
           <Link
             href="/ecommerce/produtos"
             className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent text-foreground"

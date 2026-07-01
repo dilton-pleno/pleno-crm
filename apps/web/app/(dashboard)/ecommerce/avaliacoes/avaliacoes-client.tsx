@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft, Star } from "lucide-react";
+import { useEcommerceStore, StoreSelector } from "@/components/ecommerce/use-store";
 
 interface Review {
   id: string;
@@ -35,11 +36,13 @@ export function AvaliacoesClient() {
   const [avg, setAvg] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const { stores, storeId, setStoreId } = useEcommerceStore();
 
   const fetchReviews = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/ecommerce/reviews?page=${page}&limit=${PER_PAGE}`);
+      const sq = storeId ? `&store=${storeId}` : "";
+      const res = await fetch(`/api/v1/ecommerce/reviews?page=${page}&limit=${PER_PAGE}${sq}`);
       if (res.ok) {
         const json = (await res.json()) as {
           data: Review[];
@@ -52,7 +55,7 @@ export function AvaliacoesClient() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, storeId]);
 
   useEffect(() => {
     void fetchReviews();
@@ -67,6 +70,7 @@ export function AvaliacoesClient() {
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <h1 className="text-lg font-semibold text-foreground">Avaliações</h1>
+        <div className="ml-auto"><StoreSelector stores={stores} storeId={storeId} setStoreId={setStoreId} /></div>
       </div>
 
       <div className="flex items-center gap-4 bg-card border border-border rounded-lg p-4 shrink-0">

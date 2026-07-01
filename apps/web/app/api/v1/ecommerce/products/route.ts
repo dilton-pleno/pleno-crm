@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAccess } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
 import { dec } from "@/lib/analytics-query";
+import { resolveEcommerceStoreId } from "@/lib/store-integration";
 
 interface SalesRow {
   pid: string;
@@ -20,15 +22,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const limit = Math.min(100, Math.max(1, parseInt(params.get("limit") ?? "20", 10)));
   const search = params.get("search")?.trim();
   const sort = (params.get("sort") as SortKey) ?? "units";
+  const storeId = await resolveEcommerceStoreId(params.get("store"));
 
-  // Cruzamento de vendas: agrega itens de pedidos por id de produto, derivado
-  // do prefixo do SKU (ex.: "5307.0006.0" -> "5307").
+  // Cruzamento de vendas: agrega itens de pedidos DA LOJA por id de produto,
+  // derivado do prefixo do SKU (ex.: "5307.0006.0" -> "5307").
   const salesRows = await prisma.$queryRaw<SalesRow[]>`
     SELECT split_part(item->>'sku', '.', 1) AS pid,
            SUM((item->>'quantity')::numeric)::int AS units,
            SUM((item->>'quantity')::numeric * (item->>'unit_price')::numeric)::float8 AS revenue
     FROM orders, jsonb_array_elements(items) AS item
     WHERE items IS NOT NULL AND item->>'sku' IS NOT NULL
+      AND store_integration_id = ${storeId}
     GROUP BY pid
   `;
   const salesMap = new Map<string, { units: number; revenue: number }>();
@@ -36,17 +40,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     salesMap.set(r.pid, { units: Number(r.units), revenue: Number(r.revenue) });
   }
 
-  const products = await prisma.wbuyProduct.findMany({
-    where: search
+  const where: Prisma.WbuyProductWhereInput = {
+    storeIntegrationId: storeId,
+    ...(search
       ? {
           OR: [
-            { name: { contains: search, mode: "insensitive" } },
+            { name: { contains: search, mode: "insensitive" as const } },
             { cod: { contains: search } },
-            { brand: { contains: search, mode: "insensitive" } },
+            { brand: { contains: search, mode: "insensitive" as const } },
           ],
         }
-      : {},
-  });
+      : {}),
+  };
+  const products = await prisma.wbuyProduct.findMany({ where });
 
   const merged = products.map((p) => {
     const s = salesMap.get(p.externalId) ?? { units: 0, revenue: 0 };

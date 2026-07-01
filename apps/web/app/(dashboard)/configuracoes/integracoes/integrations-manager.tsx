@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Plus, X, MessageCircle, Cloud, Facebook, CheckCircle2, AlertCircle,
-  RefreshCw, QrCode, Unplug, History, Trash2, Pencil, Radio,
+  RefreshCw, QrCode, Unplug, History, Trash2, Pencil, Radio, ShoppingCart, Link2,
 } from "lucide-react";
 
-type IntegrationType = "whatsapp" | "meta";
+type IntegrationType = "whatsapp" | "meta" | "ecommerce";
 type Provider = "evolution" | "cloud";
 
 interface IntegrationItem {
@@ -14,6 +14,7 @@ interface IntegrationItem {
   type: IntegrationType;
   name: string;
   provider: Provider | null;
+  platform: string | null;
   active: boolean;
   wa_instance: string | null;
   wa_phone_number_id: string | null;
@@ -21,6 +22,8 @@ interface IntegrationItem {
   meta_page_id: string | null;
   meta_ig_id: string | null;
   has_token: boolean;
+  api_user_masked: string | null;
+  has_secret: boolean;
   assigned_inbox: { id: string; name: string } | null;
 }
 
@@ -35,12 +38,15 @@ interface FormState {
   meta_ig_id: string;
   access_token: string;
   verify_token: string;
+  api_user: string;
+  api_secret: string;
 }
 
 const EMPTY_FORM: FormState = {
   type: "whatsapp", provider: "evolution", name: "",
   wa_instance: "", wa_phone_number_id: "", waba_id: "",
   meta_page_id: "", meta_ig_id: "", access_token: "", verify_token: "",
+  api_user: "", api_secret: "",
 };
 
 const INPUT = "text-sm bg-background border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-ring w-full";
@@ -89,6 +95,7 @@ export function IntegrationsManager() {
       type: i.type, provider: (i.provider ?? "evolution") as Provider, name: i.name,
       wa_instance: i.wa_instance ?? "", wa_phone_number_id: i.wa_phone_number_id ?? "", waba_id: i.waba_id ?? "",
       meta_page_id: i.meta_page_id ?? "", meta_ig_id: i.meta_ig_id ?? "", access_token: "", verify_token: "",
+      api_user: "", api_secret: "",
     });
     setEditingId(i.id);
     setStep("form");
@@ -106,11 +113,17 @@ export function IntegrationsManager() {
           payload.waba_id = form.waba_id;
           if (form.verify_token.trim()) payload.verify_token = form.verify_token;
         }
-      } else {
+        if (form.access_token.trim()) payload.access_token = form.access_token;
+      } else if (form.type === "meta") {
         payload.meta_page_id = form.meta_page_id;
         payload.meta_ig_id = form.meta_ig_id;
+        if (form.access_token.trim()) payload.access_token = form.access_token;
+      } else {
+        // ecommerce
+        payload.platform = "wbuy";
+        if (form.api_user.trim()) payload.api_user = form.api_user;
+        if (form.api_secret.trim()) payload.api_secret = form.api_secret;
       }
-      if (form.access_token.trim()) payload.access_token = form.access_token;
 
       const url = editingId ? `/api/v1/integrations/${editingId}` : "/api/v1/integrations";
       const method = editingId ? "PATCH" : "POST";
@@ -168,6 +181,7 @@ export function IntegrationsManager() {
 
   const whats = items.filter((i) => i.type === "whatsapp");
   const metas = items.filter((i) => i.type === "meta");
+  const ecoms = items.filter((i) => i.type === "ecommerce");
 
   return (
     <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4">
@@ -192,12 +206,15 @@ export function IntegrationsManager() {
       {step === "type" && (
         <div className="border-t border-border pt-4 flex flex-col gap-3">
           <p className="text-sm font-medium text-foreground">Qual integração deseja criar?</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button onClick={() => { setForm({ ...EMPTY_FORM, type: "whatsapp" }); setStep("provider"); }} className="flex items-center gap-2 text-sm border border-border rounded-md px-3 py-3 hover:bg-accent">
               <MessageCircle className="w-4 h-4 text-green-600" /> WhatsApp
             </button>
             <button onClick={() => { setForm({ ...EMPTY_FORM, type: "meta" }); setStep("form"); }} className="flex items-center gap-2 text-sm border border-border rounded-md px-3 py-3 hover:bg-accent">
               <Facebook className="w-4 h-4 text-blue-600" /> Instagram / Messenger
+            </button>
+            <button onClick={() => { setForm({ ...EMPTY_FORM, type: "ecommerce" }); setStep("form"); }} className="flex items-center gap-2 text-sm border border-border rounded-md px-3 py-3 hover:bg-accent">
+              <ShoppingCart className="w-4 h-4 text-orange-600" /> E-commerce
             </button>
           </div>
           <button onClick={cancel} className="text-xs text-muted-foreground hover:bg-accent rounded-md px-3 py-1.5 self-start">Cancelar</button>
@@ -222,9 +239,9 @@ export function IntegrationsManager() {
       {step === "form" && (
         <div className="border-t border-border pt-4 flex flex-col gap-2">
           <p className="text-sm font-medium text-foreground">
-            {editingId ? "Editar integração" : "Nova integração"} — {form.type === "meta" ? "Meta (Instagram/Messenger)" : form.provider === "cloud" ? "WhatsApp Cloud (oficial)" : "WhatsApp Evolution"}
+            {editingId ? "Editar integração" : "Nova integração"} — {form.type === "meta" ? "Meta (Instagram/Messenger)" : form.type === "ecommerce" ? "E-commerce (Wbuy)" : form.provider === "cloud" ? "WhatsApp Cloud (oficial)" : "WhatsApp Evolution"}
           </p>
-          <Field label="Nome da integração" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder="Ex.: Atendimento, Comercial" />
+          <Field label="Nome da integração" value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder={form.type === "ecommerce" ? "Ex.: Loja principal, Loja 2" : "Ex.: Atendimento, Comercial"} />
 
           {form.type === "whatsapp" && form.provider === "evolution" && (
             <Field label="Instância do WhatsApp (Evolution)" value={form.wa_instance} onChange={(v) => setForm({ ...form, wa_instance: v })} placeholder="nome-da-instancia" />
@@ -242,6 +259,13 @@ export function IntegrationsManager() {
               <Field label="Meta Page ID (Messenger)" value={form.meta_page_id} onChange={(v) => setForm({ ...form, meta_page_id: v })} placeholder="ID da página do Facebook" />
               <Field label="Instagram ID" value={form.meta_ig_id} onChange={(v) => setForm({ ...form, meta_ig_id: v })} placeholder="ID da conta do Instagram" />
               <Field label="Token da página (acesso)" value={form.access_token} onChange={(v) => setForm({ ...form, access_token: v })} placeholder={editingId ? "•••• (mantém se vazio)" : "Token de acesso da página"} secret />
+            </>
+          )}
+          {form.type === "ecommerce" && (
+            <>
+              <Field label="Usuário da API (Wbuy)" value={form.api_user} onChange={(v) => setForm({ ...form, api_user: v })} placeholder={editingId ? "•••• (mantém se vazio)" : "API user da Wbuy"} />
+              <Field label="Segredo da API (Wbuy)" value={form.api_secret} onChange={(v) => setForm({ ...form, api_secret: v })} placeholder={editingId ? "•••• (mantém se vazio)" : "API secret da Wbuy"} secret />
+              <p className="text-[10px] text-muted-foreground">Após criar, gere a URL de webhook própria da loja e registre na Wbuy (botão “Webhooks”).</p>
             </>
           )}
 
@@ -266,6 +290,7 @@ export function IntegrationsManager() {
             <>
               {whats.length > 0 && <IntegrationGroup title="WhatsApp" items={whats} tests={tests} busy={busy} onEdit={startEdit} onRemove={remove} onTest={test} onQr={qr} onDisconnect={disconnect} onImport={importHistory} />}
               {metas.length > 0 && <IntegrationGroup title="Instagram / Messenger" items={metas} tests={tests} busy={busy} onEdit={startEdit} onRemove={remove} onTest={test} onQr={qr} onDisconnect={disconnect} onImport={importHistory} />}
+              {ecoms.length > 0 && <EcommerceStores items={ecoms} onEdit={startEdit} onRemove={remove} />}
             </>
           )}
         </div>
@@ -344,6 +369,110 @@ function IntegrationGroup({ title, items, tests, busy, onEdit, onRemove, onTest,
               <div className={`flex items-center gap-1.5 text-[11px] ${t.kind === "ok" ? "text-green-600" : "text-destructive"}`}>
                 {t.kind === "ok" ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
                 {t.text}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const SYNC_KINDS: { kind: string; label: string }[] = [
+  { kind: "orders", label: "Pedidos" },
+  { kind: "customers", label: "Clientes" },
+  { kind: "products", label: "Produtos" },
+  { kind: "reviews", label: "Avaliações" },
+  { kind: "newsletter", label: "Newsletter" },
+];
+
+// Lojas de e-commerce (integrações type "ecommerce"): ações próprias (testar,
+// sincronizar por tipo, registrar webhooks, importar histórico, ver URL).
+function EcommerceStores({ items, onEdit, onRemove }: {
+  items: IntegrationItem[];
+  onEdit: (i: IntegrationItem) => void;
+  onRemove: (i: IntegrationItem) => void;
+}) {
+  const [msgs, setMsgs] = useState<Record<string, Msg>>({});
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const set = (id: string, m: Msg) => setMsgs((p) => ({ ...p, [id]: m }));
+
+  const test = async (id: string) => {
+    set(id, { kind: "ok", text: "Testando…" });
+    const res = await fetch(`/api/v1/integrations/${id}/ecommerce/test`, { method: "POST" });
+    const j = await res.json();
+    set(id, res.ok ? { kind: j.data.connected ? "ok" : "err", text: j.data.connected ? "Conexão OK" : "Falha na conexão" } : { kind: "err", text: j.error?.message ?? "Falha" });
+  };
+
+  const sync = async (id: string, kind: string) => {
+    setBusyId(id);
+    set(id, { kind: "ok", text: `Sincronizando ${kind}…` });
+    try {
+      const res = await fetch(`/api/v1/integrations/${id}/ecommerce/sync`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind }) });
+      const j = await res.json();
+      set(id, res.ok ? { kind: "ok", text: `${kind}: ${j.data.synced ?? j.data.enriched ?? j.data.created ?? 0} ok` } : { kind: "err", text: j.error?.message ?? "Falha" });
+    } finally { setBusyId(null); }
+  };
+
+  const registerWebhooks = async (id: string) => {
+    set(id, { kind: "ok", text: "Registrando webhooks…" });
+    const res = await fetch(`/api/v1/integrations/${id}/ecommerce/webhooks`, { method: "POST" });
+    const j = await res.json();
+    if (res.ok) {
+      const okCount = (j.data.registered as { ok: boolean }[]).filter((r) => r.ok).length;
+      set(id, { kind: "ok", text: `Webhooks registrados (${okCount})` });
+    } else set(id, { kind: "err", text: j.error?.message ?? "Falha" });
+  };
+
+  const showUrl = async (id: string) => {
+    const res = await fetch(`/api/v1/integrations/${id}/ecommerce/webhooks`);
+    const j = await res.json();
+    if (res.ok && j.data.url) setUrls((p) => ({ ...p, [id]: j.data.url as string }));
+    else set(id, { kind: "err", text: j.error?.message ?? "Sem URL" });
+  };
+
+  const importHistory = async (id: string) => {
+    if (!confirm("Importar todo o histórico de pedidos desta loja? Roda em segundo plano.")) return;
+    const res = await fetch(`/api/v1/integrations/${id}/ecommerce/import-history`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    const j = await res.json();
+    set(id, res.ok ? { kind: "ok", text: "Importação iniciada" } : { kind: "err", text: j.error?.message ?? "Falha" });
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">E-commerce (lojas)</p>
+      {items.map((i) => {
+        const m = msgs[i.id];
+        return (
+          <div key={i.id} className="border border-border rounded-lg p-3 flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4 text-orange-600" />
+              <span className="text-sm font-medium text-foreground truncate">{i.name}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{i.platform ?? "wbuy"}</span>
+              {i.api_user_masked && <span className="text-[10px] text-muted-foreground">{i.api_user_masked}{i.has_secret ? " · secret ✓" : ""}</span>}
+              <div className="ml-auto flex items-center gap-1">
+                <button onClick={() => onEdit(i)} className="p-1.5 text-muted-foreground hover:bg-accent rounded" title="Editar"><Pencil className="w-3.5 h-3.5" /></button>
+                <button onClick={() => onRemove(i)} className="p-1.5 text-destructive hover:bg-destructive/10 rounded" title="Excluir"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 flex-wrap">
+              <button onClick={() => void test(i.id)} className="flex items-center gap-1 text-[11px] border border-border rounded px-2 py-1 hover:bg-accent"><RefreshCw className="w-3 h-3" /> Testar</button>
+              {SYNC_KINDS.map((k) => (
+                <button key={k.kind} onClick={() => void sync(i.id, k.kind)} disabled={busyId === i.id} className="text-[11px] border border-border rounded px-2 py-1 hover:bg-accent disabled:opacity-50">{k.label}</button>
+              ))}
+              <button onClick={() => void importHistory(i.id)} className="flex items-center gap-1 text-[11px] border border-border rounded px-2 py-1 hover:bg-accent"><History className="w-3 h-3" /> Importar histórico</button>
+              <button onClick={() => void registerWebhooks(i.id)} className="flex items-center gap-1 text-[11px] border border-border rounded px-2 py-1 hover:bg-accent"><Link2 className="w-3 h-3" /> Registrar webhooks</button>
+              <button onClick={() => void showUrl(i.id)} className="text-[11px] border border-border rounded px-2 py-1 hover:bg-accent">Ver URL</button>
+            </div>
+            {urls[i.id] && (
+              <input readOnly value={urls[i.id]} onFocus={(e) => e.currentTarget.select()} className="text-[10px] bg-background border border-border rounded px-2 py-1 font-mono" />
+            )}
+            {m && (
+              <div className={`flex items-center gap-1.5 text-[11px] ${m.kind === "ok" ? "text-green-600" : "text-destructive"}`}>
+                {m.kind === "ok" ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                {m.text}
               </div>
             )}
           </div>

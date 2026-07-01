@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft, AlertTriangle, Eye } from "lucide-react";
+import { useEcommerceStore, StoreSelector } from "@/components/ecommerce/use-store";
 
 interface Product {
   id: string;
@@ -40,12 +41,14 @@ export function ProdutosClient() {
   const [searchInput, setSearchInput] = useState("");
   const [sort, setSort] = useState<SortKey>("units");
   const [loading, setLoading] = useState(true);
+  const { stores, storeId, setStoreId } = useEcommerceStore();
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
       const qs = new URLSearchParams({ page: String(page), limit: String(PER_PAGE), sort });
       if (search) qs.set("search", search);
+      if (storeId) qs.set("store", storeId);
       const res = await fetch(`/api/v1/ecommerce/products?${qs.toString()}`);
       if (res.ok) {
         const json = (await res.json()) as { data: Product[]; meta: { total: number } };
@@ -55,7 +58,7 @@ export function ProdutosClient() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, sort]);
+  }, [page, search, sort, storeId]);
 
   useEffect(() => {
     void fetchProducts();
@@ -86,6 +89,7 @@ export function ProdutosClient() {
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <h1 className="text-lg font-semibold text-foreground">Produtos ativos</h1>
+        <div className="ml-auto"><StoreSelector stores={stores} storeId={storeId} setStoreId={setStoreId} /></div>
       </div>
 
       <div className="flex items-center justify-between gap-3 flex-wrap shrink-0">
