@@ -124,7 +124,10 @@ export async function getGoogleAccessToken(): Promise<string> {
       grant_type: "refresh_token",
     }),
   });
-  if (!res.ok) throw new Error(`Google OAuth falhou [${res.status}]`);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Google OAuth falhou [${res.status}]: ${body}`);
+  }
   const json = (await res.json()) as { access_token: string };
   return json.access_token;
 }
