@@ -1,6 +1,8 @@
 import type { MediaType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendText, sendMedia } from "@/lib/evolution";
+import * as cloud from "@/lib/whatsapp-cloud";
+import { getWhatsappChannel } from "@/lib/whatsapp-channel-config";
 import { sendInstagramDirect, sendMessengerMessage } from "@/lib/meta";
 import { resolveWhatsappInstance } from "@/lib/inbox-routing";
 import { emitEvent } from "@/lib/websocket";
@@ -41,13 +43,30 @@ export async function sendOutboundMessage(
   let externalId: string | null = null;
 
   if (channelType === "whatsapp") {
-    const instance = await resolveWhatsappInstance(conversation.inboxId);
-    if (mediaUrl && mediaType) {
-      const result = await sendMedia(instance, to, mediaUrl, content ?? "", mediaType);
-      externalId = result.key?.id ?? null;
-    } else if (content) {
-      const result = await sendText(instance, to, content);
-      externalId = result.key?.id ?? null;
+    const ch = await getWhatsappChannel(conversation.inboxId);
+    if (ch.provider === "cloud") {
+      // API oficial (Meta Cloud API).
+      if (!ch.phoneNumberId || !ch.accessToken) {
+        throw new Error("Canal WhatsApp (API oficial) sem phone_number_id/token configurado");
+      }
+      const creds = { phoneNumberId: ch.phoneNumberId, accessToken: ch.accessToken };
+      if (mediaUrl && mediaType) {
+        const result = await cloud.sendMediaByLink(creds, to, { link: mediaUrl, type: mediaType, caption: content });
+        externalId = result.id;
+      } else if (content) {
+        const result = await cloud.sendText(creds, to, content);
+        externalId = result.id;
+      }
+    } else {
+      // API não oficial (Evolution) — comportamento atual.
+      const instance = await resolveWhatsappInstance(conversation.inboxId);
+      if (mediaUrl && mediaType) {
+        const result = await sendMedia(instance, to, mediaUrl, content ?? "", mediaType);
+        externalId = result.key?.id ?? null;
+      } else if (content) {
+        const result = await sendText(instance, to, content);
+        externalId = result.key?.id ?? null;
+      }
     }
   } else if (channelType === "instagram" || channelType === "messenger") {
     if (!content) throw new Error("Envio de mídia ainda não suportado neste canal");

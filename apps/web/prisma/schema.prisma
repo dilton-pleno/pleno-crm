@@ -207,8 +207,15 @@ model Inbox {
   id     String  @id @default(uuid())
   name   String // ex.: "Canal XPTO" — rótulo na UI: "Canal"
   active Boolean @default(true)
-  // WhatsApp (Evolution): instância própria (a API key é global da Evolution).
+  // WhatsApp — provider por Canal: "evolution" (API não oficial) ou "cloud"
+  // (API oficial Meta Cloud). Default evolution mantém o comportamento atual.
+  whatsappProvider String @default("evolution") @map("whatsapp_provider")
+  // Evolution: instância própria (a API key é global da Evolution).
   whatsappInstance String? @map("whatsapp_instance")
+  // Cloud API (oficial): phone_number_id roteia o webhook; token/WABA/verify
+  // cifrados em whatsappConfig.
+  whatsappPhoneNumberId String? @map("whatsapp_phone_number_id")
+  whatsappConfig        Json?   @map("whatsapp_config") // accessTokenEnc, wabaId, verifyTokenEnc (cifrados)
   // Meta mensageria por Canal: page/IG + token/verify cifrados em metaConfig.
   metaPageId String? @map("meta_page_id")
   metaIgId   String? @map("meta_ig_id")

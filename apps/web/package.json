@@ -11,6 +11,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "db:cleanup": "tsx prisma/cleanup-pre-entrega.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
