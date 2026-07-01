@@ -11,8 +11,9 @@ export async function POST(): Promise<NextResponse> {
     return NextResponse.json({ data: { ok: true, accountName } });
   } catch (err) {
     console.error("[integrations/meta-ads] Teste falhou:", err);
+    const detail = err instanceof Error ? err.message : "Falha na conexão de anúncios";
     return NextResponse.json(
-      { error: { code: "META_ADS_ERROR", message: "Falha na conexão de anúncios" } },
+      { error: { code: "META_ADS_ERROR", message: detail } },
       { status: 502 }
     );
   }
