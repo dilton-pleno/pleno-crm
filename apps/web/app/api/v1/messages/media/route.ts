@@ -3,6 +3,8 @@ import { requireAccess } from "@/lib/api-auth";
 import { requireConversationAccess } from "@/lib/resource-access";
 import { prisma } from "@/lib/prisma";
 import { sendMediaBase64, sendWhatsAppAudio } from "@/lib/evolution";
+import * as cloud from "@/lib/whatsapp-cloud";
+import { getWhatsappChannel } from "@/lib/whatsapp-channel-config";
 import { resolveWhatsappInstance } from "@/lib/inbox-routing";
 import { emitEvent } from "@/lib/websocket";
 
@@ -65,26 +67,51 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const base64 = buffer.toString("base64");
   const mimetype = file.type || "application/octet-stream";
   const fileName = file.name || "arquivo";
   const to = conversation.channel.channelIdentifier;
-  const instanceName = await resolveWhatsappInstance(conversation.inboxId);
+  const ch = await getWhatsappChannel(conversation.inboxId);
 
   let externalId: string | null = null;
   try {
-    if (mediaType === "audio") {
-      const result = await sendWhatsAppAudio(instanceName, to, base64);
-      externalId = result.key?.id ?? null;
-    } else {
-      const result = await sendMediaBase64(instanceName, to, {
-        base64,
-        mimetype,
+    if (ch.provider === "cloud") {
+      // API oficial: sobe os bytes e envia por media id.
+      if (!ch.phoneNumberId || !ch.accessToken) {
+        return NextResponse.json(
+          { error: { code: "NOT_CONFIGURED", message: "Canal WhatsApp (API oficial) sem phone_number_id/token" } },
+          { status: 422 }
+        );
+      }
+      const creds = { phoneNumberId: ch.phoneNumberId, accessToken: ch.accessToken };
+      const mediaId = await cloud.uploadMedia(creds, {
+        bytes: new Uint8Array(buffer),
+        mimeType: mimetype,
         fileName,
-        caption: caption ?? "",
-        mediatype: mediaType,
       });
-      externalId = result.key?.id ?? null;
+      const result = await cloud.sendMediaById(creds, to, {
+        mediaId,
+        type: mediaType,
+        caption,
+        fileName,
+      });
+      externalId = result.id;
+    } else {
+      // API não oficial (Evolution).
+      const base64 = buffer.toString("base64");
+      const instanceName = await resolveWhatsappInstance(conversation.inboxId);
+      if (mediaType === "audio") {
+        const result = await sendWhatsAppAudio(instanceName, to, base64);
+        externalId = result.key?.id ?? null;
+      } else {
+        const result = await sendMediaBase64(instanceName, to, {
+          base64,
+          mimetype,
+          fileName,
+          caption: caption ?? "",
+          mediatype: mediaType,
+        });
+        externalId = result.key?.id ?? null;
+      }
     }
   } catch (err) {
     console.error("[messages/media] Erro ao enviar arquivo:", err);

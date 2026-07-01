@@ -81,6 +81,55 @@ export async function sendMediaByLink(
   return { id: json.messages?.[0]?.id ?? null };
 }
 
+/**
+ * Sobe um arquivo (bytes) para a Cloud API via POST /{phone_number_id}/media
+ * (multipart). Retorna o media id, que depois é enviado por sendMediaById.
+ * A Cloud não aceita a nossa URL de mídia protegida, então subimos os bytes.
+ */
+export async function uploadMedia(
+  creds: CloudCreds,
+  params: { bytes: Uint8Array; mimeType: string; fileName: string }
+): Promise<string> {
+  // Cópia para um ArrayBuffer próprio (evita incompatibilidade de tipo do Blob
+  // com Uint8Array<ArrayBufferLike> vindo do Buffer do Node).
+  const ab = new ArrayBuffer(params.bytes.byteLength);
+  new Uint8Array(ab).set(params.bytes);
+
+  const fd = new FormData();
+  fd.append("messaging_product", "whatsapp");
+  fd.append("type", params.mimeType);
+  fd.append("file", new Blob([ab], { type: params.mimeType }), params.fileName);
+
+  // Não definir Content-Type manualmente: o fetch cuida do boundary do multipart.
+  const res = await fetch(graphUrl(`${creds.phoneNumberId}/media`), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${creds.accessToken}` },
+    body: fd,
+  });
+  const json = (await res.json().catch(() => ({}))) as { id?: string; error?: { message?: string } };
+  if (!res.ok || !json.id) {
+    throw new Error(`WhatsApp Cloud uploadMedia falhou [${res.status}]: ${json.error?.message ?? JSON.stringify(json)}`);
+  }
+  return json.id;
+}
+
+/** Envia mídia já hospedada na Meta (media id obtido por uploadMedia). */
+export async function sendMediaById(
+  creds: CloudCreds,
+  to: string,
+  params: { mediaId: string; type: CloudMediaType; caption?: string | null; fileName?: string | null }
+): Promise<{ id: string | null }> {
+  const media: Record<string, unknown> = { id: params.mediaId };
+  if (params.caption && ["image", "video", "document"].includes(params.type)) {
+    media.caption = params.caption;
+  }
+  if (params.fileName && params.type === "document") {
+    media.filename = params.fileName;
+  }
+  const json = await postToMessages(creds, { to, type: params.type, [params.type]: media });
+  return { id: json.messages?.[0]?.id ?? null };
+}
+
 export interface CloudMediaPayload {
   /** Bytes da mídia já baixada */
   data: Uint8Array<ArrayBuffer>;
