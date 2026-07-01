@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt, safeEqual } from "@/lib/crypto";
+import { whatsappCredsFromIntegration } from "@/lib/integrations";
 
 // Resolve qual provider de WhatsApp e quais credenciais um Canal (Inbox) usa.
 // "evolution" (API não oficial) é o default; "cloud" é a API oficial da Meta.
@@ -62,10 +63,25 @@ export async function getWhatsappChannel(inboxId?: string | null): Promise<Whats
       whatsappInstance: true,
       whatsappPhoneNumberId: true,
       whatsappConfig: true,
+      whatsappIntegration: true,
     },
   });
   if (!inbox) return env;
 
+  // Preferir a INTEGRAÇÃO vinculada ao Canal (novo modelo).
+  if (inbox.whatsappIntegration) {
+    const c = whatsappCredsFromIntegration(inbox.whatsappIntegration);
+    return {
+      provider: c.provider,
+      instance: c.instance || env.instance,
+      phoneNumberId: c.phoneNumberId || env.phoneNumberId,
+      accessToken: c.accessToken ?? env.accessToken,
+      wabaId: c.wabaId || env.wabaId,
+      verifyToken: c.verifyToken ?? env.verifyToken,
+    };
+  }
+
+  // Fallback: colunas antigas do Canal (transição) → env.
   const s = (inbox.whatsappConfig as StoredCloud | null) ?? {};
   return {
     provider: inbox.whatsappProvider === "cloud" ? "cloud" : "evolution",
@@ -114,6 +130,17 @@ export async function verifyCloudToken(token: string | null): Promise<boolean> {
     process.env.WHATSAPP_CLOUD_VERIFY_TOKEN ?? process.env.META_WEBHOOK_VERIFY_TOKEN ?? null;
   if (envToken && safeEqual(token, envToken)) return true;
 
+  // Integrações cloud (novo modelo).
+  const integrations = await prisma.integration.findMany({
+    where: { type: "whatsapp", provider: "cloud" },
+    select: { config: true },
+  });
+  for (const i of integrations) {
+    const stored = dec((i.config as StoredCloud | null)?.verifyTokenEnc);
+    if (stored && safeEqual(token, stored)) return true;
+  }
+
+  // Fallback: colunas antigas do Canal.
   const cloudInboxes = await prisma.inbox.findMany({
     where: { whatsappProvider: "cloud" },
     select: { whatsappConfig: true },

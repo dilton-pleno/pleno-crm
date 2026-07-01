@@ -220,15 +220,53 @@ model Inbox {
   metaPageId String? @map("meta_page_id")
   metaIgId   String? @map("meta_ig_id")
   metaConfig Json?   @map("meta_config") // accessTokenEnc, verifyTokenEnc (cifrados)
+  // Integrações reutilizáveis (novo modelo): o Canal SELECIONA uma integração de
+  // WhatsApp e uma de Meta. @unique garante a exclusividade 1:1 (uma integração
+  // usada num Canal não pode ser usada em outro). As colunas acima ficam como
+  // fallback durante a transição.
+  whatsappIntegrationId String? @unique @map("whatsapp_integration_id")
+  metaIntegrationId     String? @unique @map("meta_integration_id")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
+  whatsappIntegration Integration? @relation("InboxWhatsapp", fields: [whatsappIntegrationId], references: [id])
+  metaIntegration     Integration? @relation("InboxMeta",     fields: [metaIntegrationId],     references: [id])
   conversations Conversation[]
   channels      ContactChannel[]
   postComments  PostComment[]
   teams         TeamInbox[]
 
   @@map("inboxes")
+}
+
+// Integração externa como INSTÂNCIA nomeada e reutilizável (vários WhatsApp,
+// várias contas Meta). Criada em Integrações e atribuída a um Canal (1:1 via
+// Inbox.*IntegrationId @unique). Identificadores de roteamento ficam em colunas
+// indexadas; segredos ficam cifrados (AES-256-GCM) em config.
+model Integration {
+  id       String  @id @default(uuid())
+  type     String // "whatsapp" | "meta"
+  name     String // rótulo, ex.: "Atendimento", "Comercial"
+  provider String? // whatsapp: "evolution" | "cloud"; meta: null
+  active   Boolean @default(true)
+  // Roteamento (não-segredo, indexado):
+  waInstance      String? @map("wa_instance") // Evolution
+  waPhoneNumberId String? @map("wa_phone_number_id") // Cloud
+  metaPageId      String? @map("meta_page_id")
+  metaIgId        String? @map("meta_ig_id")
+  config    Json? // segredos cifrados: accessTokenEnc, wabaId, verifyTokenEnc
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  inboxWhatsapp Inbox? @relation("InboxWhatsapp")
+  inboxMeta     Inbox? @relation("InboxMeta")
+
+  @@index([type])
+  @@index([waInstance])
+  @@index([waPhoneNumberId])
+  @@index([metaPageId])
+  @@index([metaIgId])
+  @@map("integrations")
 }
 
 // ============================================================

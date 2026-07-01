@@ -27,6 +27,13 @@ export async function resolveInboxByWhatsappInstance(
   instance: string | null | undefined
 ): Promise<string | null> {
   if (instance) {
+    // Novo modelo: Integração (waInstance) → Canal vinculado.
+    const integ = await prisma.integration.findFirst({
+      where: { waInstance: instance },
+      select: { inboxWhatsapp: { select: { id: true } } },
+    });
+    if (integ?.inboxWhatsapp) return integ.inboxWhatsapp.id;
+    // Fallback: coluna antiga do Canal.
     const found = await prisma.inbox.findFirst({
       where: { whatsappInstance: instance },
       select: { id: true },
@@ -37,11 +44,19 @@ export async function resolveInboxByWhatsappInstance(
 }
 
 /**
- * Canal "oficial" para disparos ativos: o Canal ativo mais antigo com provider
- * "cloud" (WhatsApp API oficial). Retorna null se nenhum estiver configurado —
- * nesse caso os disparos ativos (status de pedido/campanhas) ficam desligados.
+ * Canal "oficial" para disparos ativos: o Canal ativo mais antigo com uma
+ * integração WhatsApp CLOUD (API oficial). Retorna null se nenhum estiver
+ * configurado — nesse caso os disparos ativos ficam desligados.
  */
 export async function getOfficialCloudInboxId(): Promise<string | null> {
+  // Novo modelo: integração cloud ativa cujo Canal está ativo.
+  const integ = await prisma.integration.findFirst({
+    where: { type: "whatsapp", provider: "cloud", active: true, inboxWhatsapp: { is: { active: true } } },
+    orderBy: { createdAt: "asc" },
+    select: { inboxWhatsapp: { select: { id: true } } },
+  });
+  if (integ?.inboxWhatsapp) return integ.inboxWhatsapp.id;
+  // Fallback: coluna antiga do Canal.
   const inbox = await prisma.inbox.findFirst({
     where: { active: true, whatsappProvider: "cloud" },
     orderBy: { createdAt: "asc" },
@@ -55,6 +70,11 @@ export async function resolveInboxByWhatsappPhoneNumberId(
   phoneNumberId: string | null | undefined
 ): Promise<string | null> {
   if (phoneNumberId) {
+    const integ = await prisma.integration.findFirst({
+      where: { waPhoneNumberId: phoneNumberId },
+      select: { inboxWhatsapp: { select: { id: true } } },
+    });
+    if (integ?.inboxWhatsapp) return integ.inboxWhatsapp.id;
     const found = await prisma.inbox.findFirst({
       where: { whatsappPhoneNumberId: phoneNumberId },
       select: { id: true },
@@ -69,6 +89,11 @@ export async function resolveInboxByMetaId(
   pageOrIgId: string | null | undefined
 ): Promise<string | null> {
   if (pageOrIgId) {
+    const integ = await prisma.integration.findFirst({
+      where: { OR: [{ metaPageId: pageOrIgId }, { metaIgId: pageOrIgId }] },
+      select: { inboxMeta: { select: { id: true } } },
+    });
+    if (integ?.inboxMeta) return integ.inboxMeta.id;
     const found = await prisma.inbox.findFirst({
       where: { OR: [{ metaPageId: pageOrIgId }, { metaIgId: pageOrIgId }] },
       select: { id: true },
@@ -79,8 +104,8 @@ export async function resolveInboxByMetaId(
 }
 
 /**
- * Instância do Evolution a usar no envio para esta conversa: a do Canal da
- * conversa quando definida, senão a global (EVOLUTION_INSTANCE).
+ * Instância do Evolution a usar no envio para esta conversa: a da integração do
+ * Canal quando definida, senão a coluna antiga, senão a global (EVOLUTION_INSTANCE).
  */
 export async function resolveWhatsappInstance(
   inboxId: string | null | undefined
@@ -89,7 +114,7 @@ export async function resolveWhatsappInstance(
   if (!inboxId) return fallback;
   const inbox = await prisma.inbox.findUnique({
     where: { id: inboxId },
-    select: { whatsappInstance: true },
+    select: { whatsappInstance: true, whatsappIntegration: { select: { waInstance: true } } },
   });
-  return inbox?.whatsappInstance || fallback;
+  return inbox?.whatsappIntegration?.waInstance || inbox?.whatsappInstance || fallback;
 }

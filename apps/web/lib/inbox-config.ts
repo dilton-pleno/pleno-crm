@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { getMetaConfig, type MetaConfig } from "@/lib/meta-config";
+import { metaCredsFromIntegration } from "@/lib/integrations";
 
 // Credenciais Meta de mensageria POR CANAL (Inbox). page/IG ficam em colunas
 // próprias (metaPageId/metaIgId); o token de acesso da página é cifrado em
@@ -31,10 +32,24 @@ export async function getMessagingConfig(inboxId?: string | null): Promise<MetaC
 
   const inbox = await prisma.inbox.findUnique({
     where: { id: inboxId },
-    select: { metaPageId: true, metaIgId: true, metaConfig: true },
+    select: { metaPageId: true, metaIgId: true, metaConfig: true, metaIntegration: true },
   });
   if (!inbox) return global;
 
+  // Preferir a INTEGRAÇÃO Meta vinculada (novo modelo); App ID/Secret/Verify globais.
+  if (inbox.metaIntegration) {
+    const c = metaCredsFromIntegration(inbox.metaIntegration);
+    return {
+      appId: global.appId,
+      appSecret: global.appSecret,
+      accessToken: c.accessToken ?? global.accessToken,
+      pageId: c.pageId || global.pageId,
+      igId: c.igId || global.igId,
+      verifyToken: global.verifyToken,
+    };
+  }
+
+  // Fallback: colunas antigas do Canal (transição).
   const s = (inbox.metaConfig as StoredInboxMeta | null) ?? {};
   return {
     appId: global.appId,
