@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Megaphone } from "lucide-react";
+import { ArrowLeft, Megaphone, Trash2 } from "lucide-react";
 
 interface StoreOpt {
   id: string;
@@ -72,6 +72,22 @@ export function ContasClient({ canManage }: { canManage: boolean }) {
     }
   };
 
+  const remove = async (a: AdAccount) => {
+    const label = `${PLATFORM_LABEL[a.platform] ?? a.platform} · ${a.account_id}`;
+    if (!confirm(`Remover a conta "${label}" e APAGAR o histórico de métricas dela? Esta ação é irreversível.`)) {
+      return;
+    }
+    setSavingId(a.id);
+    try {
+      const res = await fetch(`/api/v1/analytics/ad-accounts/${a.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setAccounts((prev) => prev.filter((x) => x.id !== a.id));
+      }
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full overflow-auto p-6 gap-4 max-w-4xl mx-auto w-full">
       <div className="flex items-center gap-2 shrink-0">
@@ -102,6 +118,7 @@ export function ContasClient({ canManage }: { canManage: boolean }) {
                 <th className="text-left font-medium px-4 py-2">Plataforma</th>
                 <th className="text-left font-medium px-3 py-2">Conta</th>
                 <th className="text-left font-medium px-4 py-2">Loja</th>
+                {canManage && <th className="w-10 px-3 py-2" />}
               </tr>
             </thead>
             <tbody>
@@ -130,6 +147,18 @@ export function ContasClient({ canManage }: { canManage: boolean }) {
                       <span className="text-foreground">{a.store_name}</span>
                     )}
                   </td>
+                  {canManage && (
+                    <td className="px-3 py-2.5 text-right">
+                      <button
+                        onClick={() => void remove(a)}
+                        disabled={savingId === a.id}
+                        title="Remover conta e apagar métricas"
+                        className="p-1 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -70,3 +70,42 @@ export async function PATCH(
 
   return NextResponse.json({ data: { id, store_integration_id: newStoreId } });
 }
+
+// Remove uma conta de anúncio (ex.: contas de demonstração do seed) e APAGA as
+// métricas associadas — libera o Marketing p/ mostrar só os dados reais. Só ADMIN.
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+  const guard = await requireRoles(["ADMIN"]);
+  if (!guard.ok) return guard.response;
+
+  const { id } = await params;
+  const mapping = await prisma.adAccountStore.findUnique({ where: { id } });
+  if (!mapping) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "Conta de anúncio não encontrada" } },
+      { status: 404 }
+    );
+  }
+
+  const removed = await prisma.$transaction(async (tx) => {
+    let metrics = 0;
+    if (mapping.platform === "ga4") {
+      // GA4 não tem coluna de conta; remove as métricas da loja dessa property.
+      const r = await tx.ga4Metric.deleteMany({
+        where: { storeIntegrationId: mapping.storeIntegrationId },
+      });
+      metrics = r.count;
+    } else {
+      const r = await tx.campaignMetric.deleteMany({
+        where: { platform: mapping.platform as AdPlatform, accountId: mapping.accountId },
+      });
+      metrics = r.count;
+    }
+    await tx.adAccountStore.delete({ where: { id } });
+    return metrics;
+  });
+
+  return NextResponse.json({ data: { id, deleted: true, metrics_removed: removed } });
+}
