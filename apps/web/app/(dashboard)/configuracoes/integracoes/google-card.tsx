@@ -107,6 +107,26 @@ export function GoogleCard() {
     }
   }, []);
 
+  const syncGa4 = useCallback(async () => {
+    setWorking(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/v1/analytics/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform: "ga4", days: 30 }),
+      });
+      const json = await res.json();
+      setMessage(
+        res.ok
+          ? { kind: "ok", text: `GA4 sincronizado — ${json.data.synced} registro(s) dos últimos 30 dias.` }
+          : { kind: "err", text: json.error?.message ?? "Falha ao sincronizar" }
+      );
+    } finally {
+      setWorking(false);
+    }
+  }, []);
+
   const field = (key: keyof typeof form, label: string, placeholder: string, secret = false) => (
     <label className="flex flex-col gap-1">
       <span className="text-[11px] text-muted-foreground">{label}</span>
@@ -217,6 +237,15 @@ export function GoogleCard() {
                   className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
                 >
                   <DownloadCloud className="w-3.5 h-3.5" /> Sincronizar Ads
+                </button>
+              )}
+              {status?.ga4PropertyId && (
+                <button
+                  onClick={() => void syncGa4()}
+                  disabled={working}
+                  className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
+                >
+                  <DownloadCloud className="w-3.5 h-3.5" /> Sincronizar GA4
                 </button>
               )}
             </>

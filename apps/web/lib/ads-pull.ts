@@ -3,6 +3,8 @@ import { getCampaignInsights, type CampaignDayInsight } from "@/lib/meta-ads";
 import { getMetaAdsConfig } from "@/lib/meta-ads-config";
 import { getCampaignMetrics } from "@/lib/google-ads";
 import { getGoogleConfig } from "@/lib/google-config";
+import { getSessionMetrics } from "@/lib/ga4";
+import { upsertGa4Rows } from "@/lib/ga4-sync";
 import { upsertCampaignMetrics, type CampaignSyncInput } from "@/lib/analytics-sync";
 
 // Orquestra a COLETA (pull) de métricas reais das plataformas de anúncio para o
@@ -71,4 +73,12 @@ export async function pullGoogleAds(range: PullRange): Promise<number> {
   if (!adsCustomerId) throw new Error("Conta do Google Ads (customer id) não configurada");
   const rows = await getCampaignMetrics(adsCustomerId, range);
   return upsertDayInsights("google", adsCustomerId, rows);
+}
+
+/** Coleta as sessões do GA4 no período e faz upsert por dia/origem/mídia. */
+export async function pullGa4(range: PullRange): Promise<number> {
+  const { ga4PropertyId } = await getGoogleConfig();
+  if (!ga4PropertyId) throw new Error("GA4 Property ID não configurado");
+  const rows = await getSessionMetrics(ga4PropertyId, range);
+  return upsertGa4Rows(rows);
 }

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAccess } from "@/lib/api-auth";
-import { rangeFromDays, pullMetaAds, pullGoogleAds } from "@/lib/ads-pull";
+import { rangeFromDays, pullMetaAds, pullGoogleAds, pullGa4 } from "@/lib/ads-pull";
 
 const schema = z.object({
-  platform: z.enum(["meta", "google"]),
+  platform: z.enum(["meta", "google", "ga4"]),
   days: z.number().int().positive().max(365).optional(),
 });
 
@@ -29,6 +29,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let synced = 0;
     if (platform === "meta") synced = await pullMetaAds(range);
     else if (platform === "google") synced = await pullGoogleAds(range);
+    else if (platform === "ga4") synced = await pullGa4(range);
 
     return NextResponse.json({
       data: { platform, synced, period: { start: range.start, end: range.end } },
