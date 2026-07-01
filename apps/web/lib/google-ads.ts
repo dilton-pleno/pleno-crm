@@ -1,13 +1,14 @@
 // Cliente da Google Ads API. PENDENTE de validação com credenciais reais
 // (developer token aprovado + OAuth refresh token). Ainda não exercitado.
 
-import type { CampaignInsight, DateRange } from "@/lib/meta-ads";
+import type { CampaignDayInsight, DateRange } from "@/lib/meta-ads";
 import { getGoogleAccessToken, getGoogleConfig } from "@/lib/google-config";
 
 const API_VERSION = "v17";
 
 interface GoogleAdsRow {
   campaign?: { id?: string; name?: string; status?: string };
+  segments?: { date?: string };
   metrics?: {
     impressions?: string;
     clicks?: string;
@@ -20,24 +21,27 @@ interface GoogleAdsRow {
 }
 
 /**
- * Busca métricas de campanhas via GAQL no período informado.
+ * Busca métricas DIÁRIAS de campanhas via GAQL no período (`segments.date` no
+ * SELECT → uma linha por campanha por dia).
  */
 export async function getCampaignMetrics(
   customerId: string,
   range: DateRange
-): Promise<CampaignInsight[]> {
+): Promise<CampaignDayInsight[]> {
   const { adsDeveloperToken: developerToken } = await getGoogleConfig();
   if (!developerToken) throw new Error("Developer token do Google Ads não configurado");
 
+  // A API exige o customer id só com dígitos (sem traços).
+  const cid = customerId.replace(/\D/g, "");
   const token = await getGoogleAccessToken();
   const query =
-    `SELECT campaign.id, campaign.name, campaign.status, metrics.impressions, ` +
-    `metrics.clicks, metrics.cost_micros, metrics.ctr, metrics.average_cpm, ` +
-    `metrics.conversions, metrics.conversions_value FROM campaign ` +
-    `WHERE segments.date BETWEEN '${range.start}' AND '${range.end}'`;
+    `SELECT campaign.id, campaign.name, campaign.status, segments.date, ` +
+    `metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.ctr, ` +
+    `metrics.average_cpm, metrics.conversions, metrics.conversions_value ` +
+    `FROM campaign WHERE segments.date BETWEEN '${range.start}' AND '${range.end}'`;
 
   const res = await fetch(
-    `https://googleads.googleapis.com/${API_VERSION}/customers/${customerId}/googleAds:searchStream`,
+    `https://googleads.googleapis.com/${API_VERSION}/customers/${cid}/googleAds:searchStream`,
     {
       method: "POST",
       headers: {
@@ -60,6 +64,7 @@ export async function getCampaignMetrics(
     const spend = Number(row.metrics?.costMicros ?? 0) / 1_000_000;
     const value = Number(row.metrics?.conversionsValue ?? 0);
     return {
+      date: row.segments?.date ?? range.start,
       id: row.campaign?.id ?? "",
       name: row.campaign?.name ?? "",
       status: row.campaign?.status ?? null,

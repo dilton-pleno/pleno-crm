@@ -1,5 +1,8 @@
-import { getCampaignInsights } from "@/lib/meta-ads";
+import type { AdPlatform } from "@prisma/client";
+import { getCampaignInsights, type CampaignDayInsight } from "@/lib/meta-ads";
 import { getMetaAdsConfig } from "@/lib/meta-ads-config";
+import { getCampaignMetrics } from "@/lib/google-ads";
+import { getGoogleConfig } from "@/lib/google-config";
 import { upsertCampaignMetrics, type CampaignSyncInput } from "@/lib/analytics-sync";
 
 // Orquestra a COLETA (pull) de métricas reais das plataformas de anúncio para o
@@ -22,14 +25,12 @@ export function rangeFromDays(days: number): PullRange {
   return { start: fmt(start), end: fmt(end) };
 }
 
-/** Coleta as campanhas do Meta Ads no período e faz upsert por dia. */
-export async function pullMetaAds(range: PullRange): Promise<number> {
-  const { adAccountId } = await getMetaAdsConfig();
-  if (!adAccountId) throw new Error("Conta de anúncios da Meta não configurada");
-
-  const rows = await getCampaignInsights(adAccountId, range);
-
-  // Agrupa por dia para o upsert (chave única é platform+campanha+data).
+/** Agrupa insights diários por data e faz upsert por dia (chave: plataforma+campanha+data). */
+async function upsertDayInsights(
+  platform: AdPlatform,
+  accountId: string,
+  rows: CampaignDayInsight[]
+): Promise<number> {
   const byDate = new Map<string, CampaignSyncInput["campaigns"]>();
   for (const r of rows) {
     const list = byDate.get(r.date) ?? [];
@@ -51,7 +52,23 @@ export async function pullMetaAds(range: PullRange): Promise<number> {
 
   let total = 0;
   for (const [date, campaigns] of byDate) {
-    total += await upsertCampaignMetrics("meta", { date, account_id: adAccountId, campaigns }, adAccountId);
+    total += await upsertCampaignMetrics(platform, { date, account_id: accountId, campaigns }, accountId);
   }
   return total;
+}
+
+/** Coleta as campanhas do Meta Ads no período e faz upsert por dia. */
+export async function pullMetaAds(range: PullRange): Promise<number> {
+  const { adAccountId } = await getMetaAdsConfig();
+  if (!adAccountId) throw new Error("Conta de anúncios da Meta não configurada");
+  const rows = await getCampaignInsights(adAccountId, range);
+  return upsertDayInsights("meta", adAccountId, rows);
+}
+
+/** Coleta as campanhas do Google Ads no período e faz upsert por dia. */
+export async function pullGoogleAds(range: PullRange): Promise<number> {
+  const { adsCustomerId } = await getGoogleConfig();
+  if (!adsCustomerId) throw new Error("Conta do Google Ads (customer id) não configurada");
+  const rows = await getCampaignMetrics(adsCustomerId, range);
+  return upsertDayInsights("google", adsCustomerId, rows);
 }

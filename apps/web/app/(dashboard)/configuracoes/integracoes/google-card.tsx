@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { BarChart3, CheckCircle2, AlertCircle, Plug, RefreshCw } from "lucide-react";
+import { BarChart3, CheckCircle2, AlertCircle, Plug, RefreshCw, DownloadCloud } from "lucide-react";
 
 interface GoogleStatus {
   clientId: boolean;
@@ -81,6 +81,26 @@ export function GoogleCard() {
         res.ok
           ? { kind: "ok", text: "Conexão OAuth OK." }
           : { kind: "err", text: json.error?.message ?? "Falha na conexão" }
+      );
+    } finally {
+      setWorking(false);
+    }
+  }, []);
+
+  const syncAds = useCallback(async () => {
+    setWorking(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/v1/analytics/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform: "google", days: 30 }),
+      });
+      const json = await res.json();
+      setMessage(
+        res.ok
+          ? { kind: "ok", text: `Google Ads sincronizado — ${json.data.synced} registro(s) dos últimos 30 dias.` }
+          : { kind: "err", text: json.error?.message ?? "Falha ao sincronizar" }
       );
     } finally {
       setWorking(false);
@@ -182,13 +202,24 @@ export function GoogleCard() {
             {configured ? "Atualizar credenciais" : "Configurar"}
           </button>
           {configured && (
-            <button
-              onClick={() => void test()}
-              disabled={working}
-              className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Testar conexão
-            </button>
+            <>
+              <button
+                onClick={() => void test()}
+                disabled={working}
+                className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Testar conexão
+              </button>
+              {status?.adsCustomerId && (
+                <button
+                  onClick={() => void syncAds()}
+                  disabled={working}
+                  className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-md px-3 py-2 hover:bg-accent disabled:opacity-50"
+                >
+                  <DownloadCloud className="w-3.5 h-3.5" /> Sincronizar Ads
+                </button>
+              )}
+            </>
           )}
         </div>
       )}

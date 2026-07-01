@@ -12,8 +12,12 @@ export async function POST(): Promise<NextResponse> {
     return NextResponse.json({ data: { ok: true } });
   } catch (err) {
     console.error("[integrations/google] Teste falhou:", err);
+    const detail =
+      err instanceof Error
+        ? err.message
+        : "Falha na conexão com o Google (verifique client/secret/refresh token)";
     return NextResponse.json(
-      { error: { code: "GOOGLE_ERROR", message: "Falha na conexão com o Google (verifique client/secret/refresh token)" } },
+      { error: { code: "GOOGLE_ERROR", message: detail } },
       { status: 502 }
     );
   }
