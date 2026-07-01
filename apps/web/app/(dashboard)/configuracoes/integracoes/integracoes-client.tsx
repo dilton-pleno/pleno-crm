@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, X, QrCode, MessageCircle, CheckCircle2, AlertCircle, History } from "lucide-react";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { WbuyCard } from "./wbuy-card";
-import { MetaCard } from "./meta-card";
 import { MetaAdsCard } from "./meta-ads-card";
 import { GoogleCard } from "./google-card";
+import { IntegrationsManager } from "./integrations-manager";
 
 interface HistoryImport {
   status: "running" | "done" | "error";
@@ -152,6 +152,11 @@ export function IntegracoesClient({ currentUserId, canManage, isAdmin }: Props) 
     <div className="flex flex-col h-full overflow-auto p-6 gap-4 max-w-2xl mx-auto w-full">
       <h1 className="text-lg font-semibold text-foreground">Integrações</h1>
 
+      {/* Admin: gerenciador de integrações como instâncias (WhatsApp + Meta). */}
+      {isAdmin && <IntegrationsManager />}
+
+      {/* Não-admin: card legado de conexão da instância global (solicitar reconexão). */}
+      {!isAdmin && (
       <div className="bg-card border border-border rounded-lg p-5 flex flex-col gap-4">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
@@ -285,9 +290,9 @@ export function IntegracoesClient({ currentUserId, canManage, isAdmin }: Props) 
           </div>
         )}
       </div>
+      )}
 
       {/* Cards de integração — gestão de credenciais só para Admin */}
-      {isAdmin && <MetaCard />}
       {isAdmin && <MetaAdsCard />}
       {isAdmin && <GoogleCard />}
       {isAdmin && <WbuyCard />}
