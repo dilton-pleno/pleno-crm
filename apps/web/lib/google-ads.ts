@@ -4,7 +4,8 @@
 import type { CampaignDayInsight, DateRange } from "@/lib/meta-ads";
 import { getGoogleAccessToken, getGoogleConfig } from "@/lib/google-config";
 
-const API_VERSION = "v17";
+// O Google aposenta versões da API a cada ~ano. Ajustável por env sem redeploy.
+const API_VERSION = process.env.GOOGLE_ADS_API_VERSION || "v24";
 
 interface GoogleAdsRow {
   campaign?: { id?: string; name?: string; status?: string };
