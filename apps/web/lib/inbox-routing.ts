@@ -36,6 +36,20 @@ export async function resolveInboxByWhatsappInstance(
   return getDefaultInboxId();
 }
 
+/** Canal correspondente a um phone_number_id da WhatsApp Cloud API; fallback p/ Padrão. */
+export async function resolveInboxByWhatsappPhoneNumberId(
+  phoneNumberId: string | null | undefined
+): Promise<string | null> {
+  if (phoneNumberId) {
+    const found = await prisma.inbox.findFirst({
+      where: { whatsappPhoneNumberId: phoneNumberId },
+      select: { id: true },
+    });
+    if (found) return found.id;
+  }
+  return getDefaultInboxId();
+}
+
 /** Canal correspondente a um page id / IG id da Meta; fallback p/ Padrão. */
 export async function resolveInboxByMetaId(
   pageOrIgId: string | null | undefined

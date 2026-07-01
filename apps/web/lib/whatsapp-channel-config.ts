@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { encrypt, decrypt } from "@/lib/crypto";
+import { encrypt, decrypt, safeEqual } from "@/lib/crypto";
 
 // Resolve qual provider de WhatsApp e quais credenciais um Canal (Inbox) usa.
 // "evolution" (API não oficial) é o default; "cloud" é a API oficial da Meta.
@@ -95,4 +95,27 @@ export function buildWhatsappCloudConfig(
 /** Indica se o Canal já tem token do Cloud guardado. */
 export function inboxHasCloudToken(cfg: Prisma.JsonValue | null): boolean {
   return Boolean((cfg as StoredCloud | null)?.accessTokenEnc);
+}
+
+/**
+ * Valida o hub.verify_token da verificação do webhook (GET). Aceita o verify
+ * token global (env) OU o de qualquer Canal "cloud" que tenha um próprio.
+ * Comparação timing-safe.
+ */
+export async function verifyCloudToken(token: string | null): Promise<boolean> {
+  if (!token) return false;
+
+  const envToken =
+    process.env.WHATSAPP_CLOUD_VERIFY_TOKEN ?? process.env.META_WEBHOOK_VERIFY_TOKEN ?? null;
+  if (envToken && safeEqual(token, envToken)) return true;
+
+  const cloudInboxes = await prisma.inbox.findMany({
+    where: { whatsappProvider: "cloud" },
+    select: { whatsappConfig: true },
+  });
+  for (const inbox of cloudInboxes) {
+    const stored = dec((inbox.whatsappConfig as StoredCloud | null)?.verifyTokenEnc);
+    if (stored && safeEqual(token, stored)) return true;
+  }
+  return false;
 }

@@ -81,6 +81,49 @@ export async function sendMediaByLink(
   return { id: json.messages?.[0]?.id ?? null };
 }
 
+export interface CloudMediaPayload {
+  /** Bytes da mídia já baixada */
+  data: Uint8Array<ArrayBuffer>;
+  mimeType: string | null;
+  fileName: string | null;
+}
+
+/**
+ * Baixa a mídia recebida a partir do media id (fluxo em 2 passos da Cloud API):
+ * 1) GET /{media-id} devolve uma URL temporária (lookaside) + mime_type;
+ * 2) GET nessa URL, autenticado com o token, devolve os bytes.
+ * Retorna null em qualquer falha, para não travar a ingestão da mensagem.
+ */
+export async function downloadMediaById(
+  creds: CloudCreds,
+  mediaId: string,
+  fileName?: string | null
+): Promise<CloudMediaPayload | null> {
+  const metaRes = await fetch(graphUrl(mediaId), {
+    headers: { Authorization: `Bearer ${creds.accessToken}` },
+  });
+  if (!metaRes.ok) return null;
+  const meta = (await metaRes.json()) as { url?: string; mime_type?: string };
+  if (!meta.url) return null;
+
+  const bin = await fetch(meta.url, {
+    headers: { Authorization: `Bearer ${creds.accessToken}` },
+  });
+  if (!bin.ok) return null;
+  const buf = Buffer.from(await bin.arrayBuffer());
+
+  return {
+    data: Uint8Array.from(buf),
+    mimeType: meta.mime_type ?? bin.headers.get("content-type"),
+    fileName: fileName ?? null,
+  };
+}
+
+/** Marca uma mensagem recebida como lida (opcional; melhora o "visto" do cliente). */
+export async function markAsRead(creds: CloudCreds, messageId: string): Promise<void> {
+  await postToMessages(creds, { status: "read", message_id: messageId });
+}
+
 export interface CloudPhoneInfo {
   verifiedName: string | null;
   displayPhoneNumber: string | null;
